@@ -148,6 +148,16 @@ public:
   int accept(Visitor *visitor);
 };
 
+class ClassDec {
+public:
+  string nombre;
+  vector<string> atributos;
+  vector<string> tipos;
+  ClassDec() {};
+  ~ClassDec() {};
+  int accept(Visitor *visitor);
+};
+
 class FCallExp : public Exp {
 public:
   string nombre;
@@ -167,6 +177,15 @@ public:
   ~FunDecList() {};
 };
 
+class ClassDecList {
+public:
+  list<ClassDec *> Classdecs;
+  void add(ClassDec *classdec) { Classdecs.push_back(classdec); };
+  int accept(Visitor *visitor);
+  ClassDecList() {};
+  ~ClassDecList() {};
+};
+
 class ReturnStatement : public Stm {
 public:
   Exp *e;
@@ -178,6 +197,7 @@ public:
 class Program {
 public:
   VarDecList *vardecs;
+  ClassDecList *classdecs;
   FunDecList *fundecs;
   Program() {};
   ~Program() {};

@@ -90,6 +90,54 @@ VarDecList *Parser::parseVarDecList() {
   return vdl;
 }
 
+ClassDec *Parser::parseClassDec() {
+  ClassDec *cd = NULL;
+  if (match(Token::CLASS)) {
+    ClassDec *cl = new ClassDec();
+    match(Token::ID);
+    cl->nombre = previous->text;
+    match(Token::PI);
+
+    while (match(Token::VAR) || match(Token::VAL)) {
+      match(Token::ID);
+      cl->atributos.push_back(previous->text);
+      match(Token::DP);
+      match(Token::ID);
+      cl->tipos.push_back(previous->text);
+      if (match(Token::PD)) {
+        match(Token::CBL);
+      }
+      if (!match(Token::COMA)) {
+        break;
+      }
+    }
+    match(Token::CBR);
+
+    cd = cl;
+  }
+  return cd;
+}
+
+list<Stm *> Parser::parseStmList() {
+  list<Stm *> slist;
+  slist.push_back(parseStatement());
+  while (match(Token::PC)) {
+    slist.push_back(parseStatement());
+  }
+  return slist;
+}
+
+ClassDecList *Parser::parseClassDecList() {
+  ClassDecList *cdl = new ClassDecList();
+  ClassDec *aux;
+  aux = parseClassDec();
+  while (aux != NULL) {
+    cdl->add(aux);
+    aux = parseClassDec();
+  }
+  return cdl;
+}
+
 StatementList *Parser::parseStatementList() {
   StatementList *sl = new StatementList();
   sl->add(parseStatement());
@@ -108,6 +156,7 @@ Body *Parser::parseBody() {
 Program *Parser::parseProgram() {
   Program *p = new Program();
   p->vardecs = parseVarDecList();
+  p->classdecs = parseClassDecList();
   p->fundecs = parseFunDecList();
   return p;
 }

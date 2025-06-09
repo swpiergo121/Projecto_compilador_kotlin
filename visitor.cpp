@@ -64,6 +64,15 @@ int FunDecList::accept(Visitor *visitor) {
   visitor->visit(this);
   return 0;
 }
+
+int ClassDec::accept(Visitor *visitor) {
+  visitor->visit(this);
+  return 0;
+}
+int ClassDecList::accept(Visitor *visitor) {
+  visitor->visit(this);
+  return 0;
+}
 ///////////////////////////////////////////////////////////////////////////////////
 
 int PrintVisitor::visit(BinaryExp *exp) {
@@ -333,6 +342,7 @@ int PrintVisitor::visit(FCallExp *e) {
   cout << ")";
   return 0;
 }
+
 void PrintVisitor::visit(FunDec *e) {
   cout << "fun " << e->tipo << " " << e->nombre << "(";
   for (auto i : e->parametros) {
@@ -344,12 +354,31 @@ void PrintVisitor::visit(FunDec *e) {
   indentacion--;
   cout << "endfun";
 }
+
 void PrintVisitor::visit(FunDecList *e) {
   for (auto i : e->Fundecs) {
     i->accept(this);
     cout << endl;
   }
 }
+
+void PrintVisitor::visit(ClassDec *e) {
+  cout << "class " << e->nombre << " " << e->nombre << "() {\n";
+  indentacion++;
+  for (int i = 0; i < e->atributos.size(); i++) {
+    cout << string(indentacion * spaces, ' ');
+    cout << "val " << e->atributos[i] << ": " << e->tipos[i] << endl;
+  }
+  indentacion--;
+  cout << "}";
+}
+void PrintVisitor::visit(ClassDecList *e) {
+  for (auto i : e->Classdecs) {
+    i->accept(this);
+    cout << endl;
+  }
+}
+
 void PrintVisitor::visit(ReturnStatement *e) {
   cout << string(indentacion * spaces, ' ');
   cout << "return(";
@@ -374,15 +403,28 @@ int EVALVisitor::visit(FCallExp *e) {
 
   return retval;
 }
+
 void EVALVisitor::visit(FunDec *e) {
   // Llenamos el mapa
   this->fdecs[e->nombre] = e;
 }
+
 void EVALVisitor::visit(FunDecList *e) {
   for (auto i : e->Fundecs) {
     i->accept(this);
   }
 }
+
+void EVALVisitor::visit(ClassDec *e) {
+  // Llenamos el mapa
+  this->cdecs[e->nombre] = e;
+}
+void EVALVisitor::visit(ClassDecList *e) {
+  for (auto i : e->Classdecs) {
+    i->accept(this);
+  }
+}
+
 void EVALVisitor::visit(ReturnStatement *e) {
   retval = e->e->accept(this);
   retcall = true;

@@ -21,6 +21,8 @@ class Body;
 class FCallExp;
 class FunDec;
 class FunDecList;
+class ClassDec;
+class ClassDecList;
 class ReturnStatement;
 class Program;
 
@@ -41,6 +43,8 @@ public:
   virtual void visit(WhileStatement *stm) = 0;
   virtual void visit(VarDec *stm) = 0;
   virtual void visit(VarDecList *stm) = 0;
+  virtual void visit(ClassDec *stm) = 0;
+  virtual void visit(ClassDecList *stm) = 0;
   virtual void visit(StatementList *stm) = 0;
   virtual void visit(Body *b) = 0;
 };
@@ -66,6 +70,8 @@ public:
   void visit(WhileStatement *stm) override;
   void visit(VarDec *stm) override;
   void visit(VarDecList *stm) override;
+  void visit(ClassDec *stm) override;
+  void visit(ClassDecList *stm) override;
   void visit(StatementList *stm) override;
   void visit(Body *b) override;
 };
@@ -73,6 +79,7 @@ public:
 class EVALVisitor : public Visitor {
   Environment env;
   unordered_map<string, FunDec *> fdecs;
+  unordered_map<string, ClassDec *> cdecs;
   int retval;
   int retcall;
 
@@ -93,6 +100,8 @@ public:
   void visit(WhileStatement *stm) override;
   void visit(VarDec *stm) override;
   void visit(VarDecList *stm) override;
+  void visit(ClassDec *stm) override;
+  void visit(ClassDecList *stm) override;
   void visit(StatementList *stm) override;
   void visit(Body *b) override;
 };

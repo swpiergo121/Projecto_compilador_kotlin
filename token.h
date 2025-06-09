@@ -35,11 +35,15 @@ public:
     COMA,
     IFEXP,
     VAR,
+    VAL,
+    DP,
     FOR,
     ENDFOR,
     TRUE,
-    FALSE
-
+    FALSE,
+    CLASS,
+    CBL,
+    CBR
   };
 
   Type type;
