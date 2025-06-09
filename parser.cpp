@@ -1,335 +1,369 @@
+// parser.cpp
 #include "parser.h"
-#include "exp.h"
-#include "scanner.h"
-#include "token.h"
-#include <iostream>
 #include <stdexcept>
 
-using namespace std;
+// --------------------
+// Helpers del Parser
+// --------------------
+Parser::Parser(const std::vector<Token> &tokens)
+    : tokens(tokens), current(0) {}
 
-bool Parser::match(Token::Type ttype) {
-  if (check(ttype)) {
-    advance();
-    return true;
-  }
-  return false;
+bool Parser::isAtEnd() const {
+    return peek().type == TokenType::END_OF_FILE;
 }
 
-bool Parser::check(Token::Type ttype) {
-  if (isAtEnd())
+const Token& Parser::peek() const {
+    return tokens[current];
+}
+
+const Token& Parser::previous() const {
+    return tokens[current - 1];
+}
+
+const Token& Parser::advance() {
+    if (!isAtEnd()) current++;
+    return previous();
+}
+
+bool Parser::check(TokenType type) const {
+    if (isAtEnd()) return false;
+    return peek().type == type;
+}
+
+bool Parser::match(const std::initializer_list<TokenType>& types) {
+    for (auto t : types) {
+        if (check(t)) {
+            advance();
+            return true;
+        }
+    }
     return false;
-  return current->type == ttype;
 }
 
-bool Parser::advance() {
-  if (!isAtEnd()) {
-    Token *temp = current;
-    if (previous)
-      delete previous;
-    current = scanner->nextToken();
-    previous = temp;
-    if (check(Token::ERR)) {
-      cout << "Error de análisis, carácter no reconocido: " << current->text
-           << endl;
-      exit(1);
-    }
-    return true;
-  }
-  return false;
+const Token& Parser::consume(TokenType type, const std::string& message) {
+    if (check(type)) return advance();
+    throw std::runtime_error("Error en token '" + peek().lexeme + "': " + message);
 }
 
-bool Parser::isAtEnd() { return (current->type == Token::END); }
-
-Parser::Parser(Scanner *sc) : scanner(sc) {
-  previous = NULL;
-  current = scanner->nextToken();
-  if (current->type == Token::ERR) {
-    cout << "Error en el primer token: " << current->text << endl;
-    exit(1);
-  }
+// --------------------
+// parseProgram
+// --------------------
+std::vector<std::unique_ptr<ASTNode>> Parser::parseProgram() {
+    std::vector<std::unique_ptr<ASTNode>> program;
+    parseVarDecList(program);
+    parseClassDecList(program);
+    parseFunDecList(program);
+    return program;
 }
 
-VarDec *Parser::parseVarDec() {
-  VarDec *vd = NULL;
-  if (match(Token::VAR)) {
-    if (!match(Token::ID)) {
-      cout << "Error: se esperaba un identificador después de 'var'." << endl;
-      exit(1);
+// --------------------
+// VarDecList, ClassDecList, FunDecList
+// --------------------
+void Parser::parseVarDecList(std::vector<std::unique_ptr<ASTNode>>& out) {
+    while (match({TokenType::VAR, TokenType::VAL})) {
+        out.push_back(parseVarDec());
     }
-    string type = previous->text;
-    list<string> ids;
-    if (!match(Token::ID)) {
-      cout << "Error: se esperaba un identificador después de 'var'." << endl;
-      exit(1);
-    }
-    ids.push_back(previous->text);
-    while (match(Token::COMA)) {
-      if (!match(Token::ID)) {
-        cout << "Error: se esperaba un identificador después de ','." << endl;
-        exit(1);
-      }
-      ids.push_back(previous->text);
-    }
-    if (!match(Token::PC)) {
-      cout << "Error: se esperaba un ';' al final de la declaración." << endl;
-      exit(1);
-    }
-    vd = new VarDec(type, ids);
-  }
-  return vd;
 }
 
-VarDecList *Parser::parseVarDecList() {
-  VarDecList *vdl = new VarDecList();
-  VarDec *aux;
-  aux = parseVarDec();
-  while (aux != NULL) {
-    vdl->add(aux);
-    aux = parseVarDec();
-  }
-  return vdl;
+void Parser::parseClassDecList(std::vector<std::unique_ptr<ASTNode>>& out) {
+    while (match({TokenType::CLASS})) {
+        out.push_back(parseClassDec());
+    }
 }
 
-StatementList *Parser::parseStatementList() {
-  StatementList *sl = new StatementList();
-  sl->add(parseStatement());
-  while (match(Token::PC)) {
-    sl->add(parseStatement());
-  }
-  return sl;
+void Parser::parseFunDecList(std::vector<std::unique_ptr<ASTNode>>& out) {
+    // al menos una función
+    do {
+        out.push_back(parseFunDec());
+    } while (!isAtEnd());
 }
 
-Body *Parser::parseBody() {
-  VarDecList *vdl = parseVarDecList();
-  StatementList *sl = parseStatementList();
-  return new Body(vdl, sl);
+// --------------------
+// Declaraciones
+// --------------------
+// VarDec ::= (var|val) id : Type [= Expr] ;
+std::unique_ptr<ASTNode> Parser::parseVarDec() {
+    bool isConst = previous().type == TokenType::VAL;
+    auto nameTok = consume(TokenType::IDENT, "Se esperaba nombre de variable");
+    consume(TokenType::COLON, "Se esperaba ':' tras nombre de variable");
+    auto typeNode = parseType();
+    std::unique_ptr<Expr> init;
+    if (match({TokenType::ASSIGN})) {
+        init = parseExpression();
+    }
+    consume(TokenType::SEMICOLON, "Se esperaba ';' tras la declaración");
+    return std::make_unique<VarDecl>(
+        isConst, nameTok.lexeme, std::move(typeNode), std::move(init)
+    );
 }
 
-Program *Parser::parseProgram() {
-  Program *p = new Program();
-  p->vardecs = parseVarDecList();
-  p->fundecs = parseFunDecList();
-  return p;
+// ClassDec ::= class id() { VarDecList }
+std::unique_ptr<ASTNode> Parser::parseClassDec() {
+    auto nameTok = consume(TokenType::IDENT, "Se esperaba nombre de struct");
+    consume(TokenType::LPAREN, "Se esperaba '(' tras nombre de struct");
+    consume(TokenType::RPAREN, "Se esperaba ')'");
+    consume(TokenType::LBRACE, "Se esperaba '{' tras struct");
+    std::vector<std::unique_ptr<ASTNode>> fields;
+    parseVarDecList(fields);
+    consume(TokenType::RBRACE, "Se esperaba '}' al final del struct");
+    auto sd = std::make_unique<StructDecl>(nameTok.lexeme);
+    return sd;
 }
 
-FunDecList *Parser::parseFunDecList() {
-  FunDecList *vdl = new FunDecList();
-  FunDec *aux;
-  aux = parseFunDec();
-  while (aux != NULL) {
-    vdl->add(aux);
-    aux = parseFunDec();
-  }
-  return vdl;
+// FunDec ::= fun id ( [ParamDecList] ) : Type { Body }
+std::unique_ptr<ASTNode> Parser::parseFunDec() {
+    auto nameTok = consume(TokenType::IDENT, "Se esperaba nombre de función");
+    auto fn = std::make_unique<FunctionDecl>(nameTok.lexeme);
+
+    consume(TokenType::LPAREN, "Se esperaba '(' tras nombre de función");
+    if (!check(TokenType::RPAREN)) {
+        parseParamDecList(fn->params);
+    }
+    consume(TokenType::RPAREN, "Se esperaba ')' tras parámetros");
+
+    consume(TokenType::COLON, "Se esperaba ':' antes del tipo de retorno");
+    fn->returnType = parseType();
+
+    // parseamos Body = VarDecList + StmtList
+    auto stmts = parseBody();
+    for (auto &s : stmts) {
+        fn->body.push_back(std::move(s));  // unique_ptr<Stmt> → unique_ptr<ASTNode>
+    }
+    return fn;
 }
 
-FunDec *Parser::parseFunDec() {
-  FunDec *vd = NULL;
-  if (match(Token::FUN)) {
-    FunDec *fu = new FunDec();
-    match(Token::ID);
-    fu->tipo = previous->text;
-    match(Token::ID);
-    fu->nombre = previous->text;
-    match(Token::PI);
-
-    while (match(Token::ID)) {
-      fu->tipos.push_back(previous->text);
-      match(Token::ID);
-      fu->parametros.push_back(previous->text);
-      if (!match(Token::COMA)) {
-        break;
-      }
+// --------------------
+// Body, ParamDecList, Type
+// --------------------
+std::vector<std::unique_ptr<Stmt>> Parser::parseBody() {
+    std::vector<std::unique_ptr<Stmt>> stmts;
+    while (match({TokenType::VAR, TokenType::VAL})) {
+        // VarDecl hereda de Stmt
+        auto decl = parseVarDec();
+        stmts.push_back(
+            std::unique_ptr<Stmt>(static_cast<Stmt*>(decl.release()))
+        );
     }
-    match(Token::PD);
-    fu->cuerpo = parseBody();
-    match(Token::ENDFUN);
-    vd = fu;
-  }
-  return vd;
+    stmts.push_back(parseStmt());
+    while (match({TokenType::SEMICOLON})) {
+        stmts.push_back(parseStmt());
+    }
+    return stmts;
 }
 
-list<Stm *> Parser::parseStmList() {
-  list<Stm *> slist;
-  slist.push_back(parseStatement());
-  while (match(Token::PC)) {
-    slist.push_back(parseStatement());
-  }
-  return slist;
+// ParamDecList ::= id : Type (',' id : Type)*
+void Parser::parseParamDecList(
+    std::vector<std::pair<std::string,std::unique_ptr<TypeNode>>>& params
+) {
+    do {
+        auto nameTok = consume(TokenType::IDENT, "Se esperaba nombre de parámetro");
+        consume(TokenType::COLON, "Se esperaba ':' tras parámetro");
+        auto t = parseType();
+        params.emplace_back(nameTok.lexeme, std::move(t));
+    } while (match({TokenType::COMMA}));
 }
 
-Stm *Parser::parseStatement() {
-  Stm *s = NULL;
-  Exp *e = NULL;
-  Body *tb = NULL; // true case
-  Body *fb = NULL; // false case
-
-  if (current == NULL) {
-    cout << "Error: Token actual es NULL" << endl;
-    exit(1);
-  }
-
-  if (match(Token::ID)) {
-    string lex = previous->text;
-
-    if (!match(Token::ASSIGN)) {
-      cout << "Error: se esperaba un '=' después del identificador." << endl;
-      exit(1);
-    }
-    e = parseCExp();
-    s = new AssignStatement(lex, e);
-  } else if (match(Token::PRINT)) {
-    if (!match(Token::PI)) {
-      cout << "Error: se esperaba un '(' después de 'print'." << endl;
-      exit(1);
-    }
-    e = parseCExp();
-    if (!match(Token::PD)) {
-      cout << "Error: se esperaba un ')' después de la expresión." << endl;
-      exit(1);
-    }
-    s = new PrintStatement(e);
-  } else if (match(Token::RETURN)) {
-    ReturnStatement *rs = new ReturnStatement();
-    match(Token::PI);
-    if (match(Token::PD)) {
-      return rs;
-    } else {
-      rs->e = parseCExp();
-      match(Token::PD);
-    }
-
-    return rs;
-  } else if (match(Token::IF)) {
-    e = parseCExp();
-    if (!match(Token::THEN)) {
-      cout << "Error: se esperaba 'then' después de la expresión." << endl;
-      exit(1);
-    }
-
-    tb = parseBody();
-
-    if (match(Token::ELSE)) {
-      fb = parseBody();
-    }
-    if (!match(Token::ENDIF)) {
-      cout << "Error: se esperaba 'end' al final de la declaración." << endl;
-      exit(1);
-    }
-    s = new IfStatement(e, tb, fb);
-
-  } else if (match(Token::WHILE)) {
-    e = parseCExp();
-    if (!match(Token::DO)) {
-      cout << "Error: se esperaba 'do' después de la expresión." << endl;
-      exit(1);
-    }
-    tb = parseBody();
-    if (!match(Token::ENDWHILE)) {
-      cout << "Error: se esperaba 'endwhile' al final de la declaración."
-           << endl;
-      exit(1);
-    }
-    s = new WhileStatement(e, tb);
-
-  } else {
-    cout << "Error: Se esperaba un identificador o 'print', pero se encontró: "
-         << *current << endl;
-    exit(1);
-  }
-  return s;
+// Type ::= IDENT
+std::unique_ptr<TypeNode> Parser::parseType() {
+    auto tok = consume(TokenType::IDENT, "Se esperaba un tipo");
+    return std::make_unique<CustomTypeNode>(tok.lexeme);
 }
 
-Exp *Parser::parseCExp() {
-  Exp *left = parseExpression();
-  if (match(Token::LT) || match(Token::LE) || match(Token::EQ)) {
-    BinaryOp op;
-    if (previous->type == Token::LT) {
-      op = LT_OP;
-    } else if (previous->type == Token::LE) {
-      op = LE_OP;
-    } else if (previous->type == Token::EQ) {
-      op = EQ_OP;
-    }
-    Exp *right = parseExpression();
-    left = new BinaryExp(left, right, op);
-  }
-  return left;
+// --------------------
+// Sentencias
+// --------------------
+std::unique_ptr<Stmt> Parser::parseStmt() {
+    if (match({TokenType::IF}))    return parseIfStmt();
+    if (match({TokenType::WHILE})) return parseWhileStmt();
+    if (match({TokenType::FOR}))   return parseForStmt();
+    if (match({TokenType::RETURN}))return parseReturnStmt();
+
+    return parseExprStmt();
 }
 
-Exp *Parser::parseExpression() {
-  Exp *left = parseTerm();
-  while (match(Token::PLUS) || match(Token::MINUS)) {
-    BinaryOp op;
-    if (previous->type == Token::PLUS) {
-      op = PLUS_OP;
-    } else if (previous->type == Token::MINUS) {
-      op = MINUS_OP;
+// if CExp { Body } [ else { Body } ]
+std::unique_ptr<Stmt> Parser::parseIfStmt() {
+    auto cond = parseExpression();
+    consume(TokenType::LBRACE, "Se esperaba '{' tras condición de if");
+    auto thenBranch = parseBody();
+    std::vector<std::unique_ptr<Stmt>> elseBranch;
+    if (match({TokenType::ELSE})) {
+        consume(TokenType::LBRACE, "Se esperaba '{' tras else");
+        elseBranch = parseBody();
     }
-    Exp *right = parseTerm();
-    left = new BinaryExp(left, right, op);
-  }
-  return left;
+    return std::make_unique<IfStmt>(
+        std::move(cond),
+        std::move(thenBranch),
+        std::move(elseBranch)
+    );
 }
 
-Exp *Parser::parseTerm() {
-  Exp *left = parseFactor();
-  while (match(Token::MUL) || match(Token::DIV)) {
-    BinaryOp op;
-    if (previous->type == Token::MUL) {
-      op = MUL_OP;
-    } else if (previous->type == Token::DIV) {
-      op = DIV_OP;
-    }
-    Exp *right = parseFactor();
-    left = new BinaryExp(left, right, op);
-  }
-  return left;
+// while ( CExp ) { Body }
+std::unique_ptr<Stmt> Parser::parseWhileStmt() {
+    consume(TokenType::LPAREN, "Se esperaba '(' tras while");
+    auto cond = parseExpression();
+    consume(TokenType::RPAREN, "Se esperaba ')'");
+    auto body = parseBody();
+    return std::make_unique<WhileStmt>(std::move(cond), std::move(body));
 }
 
-Exp *Parser::parseFactor() {
-  Exp *e;
-  Exp *e1;
-  Exp *e2;
-  if (match(Token::TRUE)) {
-    return new BoolExp(1);
-  } else if (match(Token::FALSE)) {
-    return new BoolExp(0);
-  } else if (match(Token::NUM)) {
-    return new NumberExp(stoi(previous->text));
-  } else if (match(Token::ID)) {
-    string name = previous->text;
-    if (match(Token::PI)) {
-      FCallExp *fcall = new FCallExp();
-      fcall->nombre = name;
-      Exp *e = parseCExp();
-      fcall->add(e);
-      while (match(Token::COMA)) {
-        e = parseCExp();
-        fcall->add(e);
-      }
-      match(Token::PD);
-      return fcall;
-    } else {
-      return new IdentifierExp(name);
+std::unique_ptr<Stmt> Parser::parseForStmt() {
+    consume(TokenType::LPAREN, "Se esperaba '(' tras 'for'");
+    auto idTok = consume(TokenType::IDENT, "Se esperaba variable de bucle");
+    std::string varName = idTok.lexeme;
+
+    consume(TokenType::IN, "Se esperaba 'in' en cabecera de for");
+
+    auto expr1 = parseExpression();
+
+    std::vector<std::unique_ptr<Stmt>> body = parseBody();
+
+    if (match({TokenType::RANGE})) {
+        auto expr2 = parseExpression();
+        return std::make_unique<ForRangeStmt>(
+            varName,
+            std::move(expr1),
+            std::move(expr2),
+            std::move(body)
+        );
     }
-  } else if (match(Token::IFEXP)) {
-    match(Token::PI);
-    e = parseCExp();
-    match(Token::COMA);
-    e1 = parseCExp();
-    match(Token::COMA);
-    e2 = parseCExp();
-    match(Token::PD);
-    return new IFExp(e, e1, e2);
-  } else if (match(Token::PI)) {
-    e = parseCExp();
-    if (!match(Token::PD)) {
-      cout << "Falta paréntesis derecho" << endl;
-      exit(0);
+
+    return std::make_unique<ForEachStmt>(
+        varName,
+        std::move(expr1),
+        std::move(body)
+    );
+}
+
+std::unique_ptr<Stmt> Parser::parseReturnStmt() {
+    std::unique_ptr<Expr> value;
+    if (!check(TokenType::SEMICOLON) && !check(TokenType::RBRACE)) {
+        value = parseExpression();
     }
-    return e;
-  }
-  cout << "Error: se esperaba un número o identificador." << endl;
-  exit(0);
+    return std::make_unique<ReturnStmt>(std::move(value));
+}
+
+// ExprStmt ::= Expr
+std::unique_ptr<Stmt> Parser::parseExprStmt() {
+    auto e = parseExpression();
+    return std::make_unique<ExprStmt>(std::move(e));
+}
+
+// --------------------
+// Expresiones
+// --------------------
+std::unique_ptr<Expr> Parser::parseExpression() {
+    return parseEquality();
+}
+
+std::unique_ptr<Expr> Parser::parseEquality() {
+    auto expr = parseComparison();
+    while (match({TokenType::EQ, TokenType::NEQ})) {
+        auto op = (previous().type == TokenType::EQ ? BinaryOp::EQ : BinaryOp::NEQ);
+        auto right = parseComparison();
+        expr = std::make_unique<BinaryExpr>(op, std::move(expr), std::move(right));
+    }
+    return expr;
+}
+
+std::unique_ptr<Expr> Parser::parseComparison() {
+    auto expr = parseTerm();
+    while (match({TokenType::LT, TokenType::GT, TokenType::LTEQ, TokenType::GTEQ})) {
+        TokenType t = previous().type;
+        BinaryOp op = (t == TokenType::LT ? BinaryOp::LT
+                      : t == TokenType::GT ? BinaryOp::GT
+                      : t == TokenType::LTEQ? BinaryOp::LTEQ
+                                            : BinaryOp::GTEQ);
+        auto right = parseTerm();
+        expr = std::make_unique<BinaryExpr>(op, std::move(expr), std::move(right));
+    }
+    return expr;
+}
+
+std::unique_ptr<Expr> Parser::parseTerm() {
+    auto expr = parseFactor();
+    while (match({TokenType::PLUS, TokenType::MINUS})) {
+        TokenType t = previous().type;
+        BinaryOp op = (t == TokenType::PLUS ? BinaryOp::ADD : BinaryOp::SUB);
+        auto right = parseFactor();
+        expr = std::make_unique<BinaryExpr>(op, std::move(expr), std::move(right));
+    }
+    return expr;
+}
+
+std::unique_ptr<Expr> Parser::parseFactor() {
+    auto expr = parseUnary();
+    while (match({TokenType::STAR, TokenType::SLASH, TokenType::PERCENT})) {
+        TokenType t = previous().type;
+        BinaryOp op = (t == TokenType::STAR ? BinaryOp::MUL
+                      : t == TokenType::SLASH? BinaryOp::DIV
+                                             : BinaryOp::MOD);
+        auto right = parseUnary();
+        expr = std::make_unique<BinaryExpr>(op, std::move(expr), std::move(right));
+    }
+    return expr;
+}
+
+std::unique_ptr<Expr> Parser::parseUnary() {
+    if (match({TokenType::MINUS})) {
+        auto right = parseUnary();
+        auto zero  = std::make_unique<IntLiteral>(0);
+        return std::make_unique<BinaryExpr>(BinaryOp::SUB, std::move(zero), std::move(right));
+    }
+    return parsePrimary();
+}
+
+std::unique_ptr<Expr> Parser::parsePrimary() {
+    if (match({TokenType::INT_LITERAL})) {
+        return std::make_unique<IntLiteral>(std::stoll(previous().lexeme));
+    }
+    if (match({TokenType::LONG_LITERAL})) {
+        return std::make_unique<IntLiteral>(std::stoll(previous().lexeme));
+    }
+    if (match({TokenType::IDENT})) {
+        std::string name = previous().lexeme;
+        // llamada
+        if (match({TokenType::LPAREN})) {
+            auto call = std::make_unique<CallExpr>(name);
+            if (!check(TokenType::RPAREN)) {
+                do {
+                    call->args.push_back(parseExpression());
+                } while (match({TokenType::COMMA}));
+            }
+            consume(TokenType::RPAREN, "Se esperaba ')' en llamada");
+            return call;
+        }
+        if (match({TokenType::LBRACKET})) {
+            auto idx = parseExpression();
+            consume(TokenType::RBRACKET, "Se esperaba ']' en acceso a arreglo");
+            return std::make_unique<ArrayAccessExpr>(
+                std::make_unique<VarExpr>(name),
+                std::move(idx)
+            );
+        }
+        if (match({TokenType::DOT})) {
+            auto fld = consume(TokenType::IDENT, "Se esperaba campo tras '.'");
+            return std::make_unique<FieldAccessExpr>(
+                std::make_unique<VarExpr>(name),
+                fld.lexeme
+            );
+        }
+        return std::make_unique<VarExpr>(name);
+    }
+    if (match({TokenType::LPAREN})) {
+        auto expr = parseExpression();
+        consume(TokenType::RPAREN, "Se esperaba ')'");
+        return expr;
+    }
+    if (match({TokenType::ARRAY_KW})) {
+        consume(TokenType::LT, "Se esperaba '<' tras 'Array'");
+        auto elemType = parseType();
+        consume(TokenType::GT, "Se esperaba '>' tras tipo de Array");
+        consume(TokenType::LPAREN, "Se esperaba '(' tras Array<...>");
+        auto sz = parseExpression();
+        consume(TokenType::RPAREN, "Se esperaba ')' tras tamaño de Array");
+        return std::make_unique<NewArrayExpr>(std::move(elemType), std::move(sz));
+    }
+
+    throw std::runtime_error("Error de sintaxis en expresión en token '" + peek().lexeme + "'");
 }
