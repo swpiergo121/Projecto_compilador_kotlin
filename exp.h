@@ -1,186 +1,282 @@
+// exp.h
 #ifndef EXP_H
 #define EXP_H
 
-#include "visitor.h"
-#include <list>
 #include <string>
-#include <unordered_map>
-using namespace std;
-enum BinaryOp { PLUS_OP, MINUS_OP, MUL_OP, DIV_OP, LT_OP, LE_OP, EQ_OP };
+#include <vector>
 
+// Forward-declaration del Visitor
 class Visitor;
-class Body;
 
+// -----------------------------------------------------------------------------
+// Nodo base de expresiones
+// -----------------------------------------------------------------------------
 class Exp {
 public:
-  virtual int accept(Visitor *visitor) = 0;
-  virtual ~Exp() = 0;
-  static string binopToChar(BinaryOp op);
+    virtual int accept(Visitor* v) = 0;
+    virtual ~Exp();
+    static std::string binopToChar(int op);
 };
+
+enum BinaryOp { PLUS_OP, MINUS_OP, MUL_OP, DIV_OP, LT_OP, LE_OP, EQ_OP };
+
 class IFExp : public Exp {
 public:
-  Exp *cond, *left, *right;
-  IFExp(Exp *cond, Exp *l, Exp *r);
-  int accept(Visitor *visitor);
-  ~IFExp();
+    Exp* cond;
+    Exp* left;
+    Exp* right;
+    IFExp(Exp* cond, Exp* left, Exp* right);
+    int accept(Visitor* v) override;
+    ~IFExp();
 };
 
 class BinaryExp : public Exp {
 public:
-  Exp *left, *right;
-  string type;
-  BinaryOp op;
-  BinaryExp(Exp *l, Exp *r, BinaryOp op);
-  int accept(Visitor *visitor);
-  ~BinaryExp();
+    Exp*      left;
+    Exp*      right;
+    BinaryOp  op;
+    BinaryExp(Exp* left, Exp* right, BinaryOp op);
+    int accept(Visitor* v) override;
+    ~BinaryExp();
 };
 
 class NumberExp : public Exp {
 public:
-  int value;
-  NumberExp(int v);
-  int accept(Visitor *visitor);
-  ~NumberExp();
+    int value;
+    NumberExp(int value);
+    int accept(Visitor* v) override;
+    ~NumberExp();
 };
 
 class BoolExp : public Exp {
 public:
-  int value;
-  BoolExp(bool v);
-  int accept(Visitor *visitor);
-  ~BoolExp();
+    bool value;
+    BoolExp(bool value);
+    int accept(Visitor* v) override;
+    ~BoolExp();
 };
 
 class IdentifierExp : public Exp {
 public:
-  std::string name;
-  IdentifierExp(const std::string &n);
-  int accept(Visitor *visitor);
-  ~IdentifierExp();
-};
-
-class Stm {
-public:
-  virtual int accept(Visitor *visitor) = 0;
-  virtual ~Stm() = 0;
-};
-
-class AssignStatement : public Stm {
-public:
-  std::string id;
-  Exp *rhs;
-  AssignStatement(std::string id, Exp *e);
-  int accept(Visitor *visitor);
-  ~AssignStatement();
-};
-
-class PrintStatement : public Stm {
-public:
-  Exp *e;
-  PrintStatement(Exp *e);
-  int accept(Visitor *visitor);
-  ~PrintStatement();
-};
-
-class IfStatement : public Stm {
-public:
-  Exp *condition;
-  Body *then;
-  Body *els;
-  IfStatement(Exp *condition, Body *then, Body *els);
-  int accept(Visitor *visitor);
-  ~IfStatement();
-};
-class WhileStatement : public Stm {
-public:
-  Exp *condition;
-  Body *b;
-  WhileStatement(Exp *condition, Body *b);
-  int accept(Visitor *visitor);
-  ~WhileStatement();
-};
-
-class VarDec {
-public:
-  string type;
-  list<string> vars;
-  VarDec(string type, list<string> vars);
-  int accept(Visitor *visitor);
-  ~VarDec();
-};
-
-class VarDecList {
-public:
-  list<VarDec *> vardecs;
-  VarDecList();
-  void add(VarDec *vardec);
-  int accept(Visitor *visitor);
-  ~VarDecList();
-};
-
-class StatementList {
-public:
-  list<Stm *> stms;
-  StatementList();
-  void add(Stm *stm);
-  int accept(Visitor *visitor);
-  ~StatementList();
-};
-
-class Body {
-public:
-  VarDecList *vardecs;
-  StatementList *slist;
-  int accept(Visitor *visitor);
-  Body(VarDecList *vardecs, StatementList *stms);
-  ~Body();
-};
-
-class FunDec {
-public:
-  string nombre;
-  string tipo;
-  list<string> parametros;
-  list<string> tipos;
-  Body *cuerpo;
-  FunDec() {};
-  ~FunDec() {};
-  int accept(Visitor *visitor);
+    std::string name;
+    IdentifierExp(const std::string& name);
+    int accept(Visitor* v) override;
+    ~IdentifierExp();
 };
 
 class FCallExp : public Exp {
 public:
-  string nombre;
-  list<Exp *> argumentos;
-  FCallExp() {};
-  ~FCallExp() {};
-  void add(Exp *e);
-  int accept(Visitor *visitor);
+    std::string         name;
+    std::vector<Exp*>   args;
+    FCallExp(const std::string& name);
+    void add(Exp* arg);
+    int accept(Visitor* v) override;
+    ~FCallExp();
 };
 
-class FunDecList {
+class ListExp : public Exp {
 public:
-  list<FunDec *> Fundecs;
-  void add(FunDec *fundec) { Fundecs.push_back(fundec); };
-  int accept(Visitor *visitor);
-  FunDecList() {};
-  ~FunDecList() {};
+    bool                isMutable;
+    std::vector<Exp*>   elements;
+    ListExp(bool isMutable);
+    void add(Exp* elem);
+    int accept(Visitor* v) override;
+    ~ListExp();
+};
+
+class IndexExp : public Exp {
+public:
+    std::string name;
+    Exp*        index;
+    IndexExp(const std::string& name, Exp* index);
+    int accept(Visitor* v) override;
+    ~IndexExp();
+};
+
+class DotExp : public Exp {
+public:
+    std::string object;
+    std::string member;
+    DotExp(const std::string& object, const std::string& member);
+    int accept(Visitor* v) override;
+    ~DotExp();
+};
+
+class LoopExp : public Exp {
+public:
+    Exp*   start;
+    Exp*   end;
+    Exp*   step;    // puede ser nullptr
+    bool   downTo;
+    LoopExp(Exp* start, Exp* end, Exp* step, bool downTo);
+    int accept(Visitor* v) override;
+    ~LoopExp();
+};
+
+// -----------------------------------------------------------------------------
+// Nodo base de sentencias
+// -----------------------------------------------------------------------------
+class Stm {
+public:
+    virtual int accept(Visitor* v) = 0;
+    virtual ~Stm();
+};
+
+class AssignStatement : public Stm {
+public:
+    std::string target;
+    Exp*        expr;
+    AssignStatement(const std::string& target, Exp* expr);
+    int accept(Visitor* v) override;
+    ~AssignStatement();
+};
+
+class PrintStatement : public Stm {
+public:
+    Exp* expr;
+    PrintStatement(Exp* expr);
+    int accept(Visitor* v) override;
+    ~PrintStatement();
 };
 
 class ReturnStatement : public Stm {
 public:
-  Exp *e;
-  ReturnStatement() { e = nullptr; };
-  ~ReturnStatement() {};
-  int accept(Visitor *visitor);
+    Exp* expr;  // puede ser nullptr
+    ReturnStatement(Exp* expr);
+    int accept(Visitor* v) override;
+    ~ReturnStatement();
+};
+
+class IfStatement : public Stm {
+public:
+    Exp*   condition;
+    class Body* thenBranch;
+    class Body* elseBranch;  // puede ser nullptr
+    IfStatement(Exp* condition, Body* thenBranch, Body* elseBranch);
+    int accept(Visitor* v) override;
+    ~IfStatement();
+};
+
+class WhileStatement : public Stm {
+public:
+    Exp*   condition;
+    class Body* body;
+    WhileStatement(Exp* condition, Body* body);
+    int accept(Visitor* v) override;
+    ~WhileStatement();
+};
+
+class ForStatement : public Stm {
+public:
+    std::string varName;
+    Exp*        iterable;
+    class Body* body;
+    ForStatement(const std::string& varName, Exp* iterable, Body* body);
+    int accept(Visitor* v) override;
+    ~ForStatement();
+};
+
+// -----------------------------------------------------------------------------
+// Declaraciones y listas de declaraciones
+// -----------------------------------------------------------------------------
+struct Param {
+    std::string name;
+    std::string type;
+};
+
+struct Argument {
+    std::string name;
+    std::string type;
+};
+
+class VarDec {
+public:
+    bool              isMutable;
+    std::string       name;
+    std::string       typeName;
+    Exp*              init;    // puede ser nullptr
+    VarDec(bool isMutable, const std::string& name, const std::string& typeName, Exp* init);
+    int accept(Visitor* v);  // <-- sin override
+    ~VarDec();
+};
+
+class VarDecList {
+public:
+    std::vector<VarDec*> vars;
+    VarDecList();
+    void add(VarDec* var);
+    int accept(Visitor* v);  // <-- sin override
+    ~VarDecList();
+};
+
+class ClassDec {
+public:
+    std::string             name;
+    std::vector<Argument>   args;
+    VarDecList*             members;
+    ClassDec(const std::string& name, const std::vector<Argument>& args, VarDecList* members);
+    int accept(Visitor* v);  // <-- sin override
+    ~ClassDec();
+};
+
+class ClassDecList {
+public:
+    std::vector<ClassDec*> classes;
+    ClassDecList();
+    void add(ClassDec* cls);
+    int accept(Visitor* v);  // <-- sin override
+    ~ClassDecList();
+};
+
+class FunDec {
+public:
+    std::string           name;
+    std::string           retType;
+    std::vector<Param>    params;
+    class Body*           body;
+    FunDec(const std::string& name, const std::string& retType, const std::vector<Param>& params, Body* body);
+    int accept(Visitor* v);  // <-- sin override
+    ~FunDec();
+};
+
+class FunDecList {
+public:
+    std::vector<FunDec*> functions;
+    FunDecList();
+    void add(FunDec* fn);
+    int accept(Visitor* v);  // <-- sin override
+    ~FunDecList();
+};
+
+class StatementList {
+public:
+    std::vector<Stm*> statements;
+    StatementList();
+    void add(Stm* stmt);
+    int accept(Visitor* v);  // <-- sin override
+    ~StatementList();
+};
+
+// -----------------------------------------------------------------------------
+// Body y Program
+// -----------------------------------------------------------------------------
+class Body {
+public:
+    VarDecList*     vardecs;
+    StatementList*  stmts;
+    Body(VarDecList* vardecs, StatementList* stmts);
+    int accept(Visitor* v);  // <-- sin override
+    ~Body();
 };
 
 class Program {
 public:
-  VarDecList *vardecs;
-  FunDecList *fundecs;
-  Program() {};
-  ~Program() {};
+    VarDecList*     vardecs;
+    ClassDecList*   classDecs;
+    FunDecList*     funDecs;
+    Program();
+    int accept(Visitor* v);  // <-- sin override
+    ~Program();
 };
 
 #endif // EXP_H

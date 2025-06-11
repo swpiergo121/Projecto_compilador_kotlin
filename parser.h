@@ -2,54 +2,59 @@
 #ifndef PARSER_H
 #define PARSER_H
 
-#include "AST.h"
+#include "scanner.h"
 #include "token.h"
+#include "exp.h"        // tus nodos AST: Program, VarDecList, ClassDecList, FunDecList, etc.
 #include <vector>
-#include <memory>
 #include <string>
 
 class Parser {
 public:
-    explicit Parser(const std::vector<Token> &tokens);
-    std::vector<std::unique_ptr<ASTNode>> parseProgram();
+    explicit Parser(Scanner* scanner);
+    Program* parse();      // inicia el análisis sintáctico
 
 private:
-    std::vector<Token> tokens;
-    size_t current;
+    Scanner* scanner;
+    Token*   current;
+    Token*   previous;
 
-    bool isAtEnd() const;
-    const Token& peek() const;
-    const Token& previous() const;
-    const Token& advance();
-    bool check(TokenType type) const;
-    bool match(const std::initializer_list<TokenType>& types);
-    const Token& consume(TokenType type, const std::string &msg);
+    // --- Helpers básicos ---
+    bool      match(Token::Type type);
+    bool      match(Token::Type type, const std::string& lexeme);
+    bool      check(Token::Type type) const;
+    Token*    advance();
+    Token*    consume(Token::Type type, const std::string& message);
+    bool      isAtEnd() const;
+    void      error(const std::string& msg);
 
-    void parseVarDecList(std::vector<std::unique_ptr<ASTNode>>& out);
-    void parseClassDecList(std::vector<std::unique_ptr<ASTNode>>& out);
-    void parseFunDecList(std::vector<std::unique_ptr<ASTNode>>& out);
+    // --- Producciones de la gramática ---
+    Program*            parseProgram();
+    VarDecList*         parseVarDecList();
+    ClassDecList*       parseClassDecList();
+    FunDecList*         parseFunDecList();
 
-    std::unique_ptr<ASTNode> parseVarDec();
-    std::unique_ptr<ASTNode> parseClassDec();
-    std::unique_ptr<ASTNode> parseFunDec();
-    std::vector<std::unique_ptr<Stmt>> parseBody();
-    void parseParamDecList(std::vector<std::pair<std::string,std::unique_ptr<TypeNode>>>& params);
-    std::unique_ptr<TypeNode> parseType();
+    VarDec*             parseVarDec();        // var/val id : Type [ = CExp ]
+    ClassDec*           parseClassDec();      // class id ( Arguments ) { VarDecList }
+    FunDec*             parseFunDec();        // fun id ( ParamDecList ) : Type { Body }
 
-    std::unique_ptr<Stmt> parseStmt();
-    std::unique_ptr<Stmt> parseIfStmt();
-    std::unique_ptr<Stmt> parseWhileStmt();
-    std::unique_ptr<Stmt> parseForStmt();
-    std::unique_ptr<Stmt> parseReturnStmt();
-    std::unique_ptr<Stmt> parseExprStmt();
+    std::vector<Param>*    parseParamDecList(); // id : Type (, id : Type )*
+    std::vector<Argument>* parseArguments();    // val id : Type (, val id : Type )*
 
-    std::unique_ptr<Expr> parseExpression();
-    std::unique_ptr<Expr> parseEquality();
-    std::unique_ptr<Expr> parseComparison();
-    std::unique_ptr<Expr> parseTerm();
-    std::unique_ptr<Expr> parseFactor();
-    std::unique_ptr<Expr> parseUnary();
-    std::unique_ptr<Expr> parsePrimary();
+    Body*               parseBody();          // VarDecList StmtList
+    StatementList*      parseStmtList();      // Stmt ( ; Stmt )*
+    Stm*                parseStmt();          // cada tipo de sentencia
+
+    Exp*                parseCExp();          // Exp [(<|<=|==) Exp]
+    Exp*                parseExpression();    // Term ((+|-) Term)*
+    Exp*                parseTerm();          // Factor ((*|/) Factor)*
+    Exp*                parseFactor();        // literales, llamadas, paréntesis, if-exp, index, dot, lista
+
+    std::vector<Exp*>   parseArgList();       // CExp (, CExp)*
+    ListExp*            parseListExp();       // listOf(...) | mutableListOf(...)
+    LoopExp*            parseLoopExp();       // CExp .. CExp [ step CExp ] | downTo
+
+    // para el for:
+    // for ( id in (LoopExp | id) ) { Body }
 };
 
 #endif // PARSER_H
