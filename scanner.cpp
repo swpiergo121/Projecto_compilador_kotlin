@@ -59,7 +59,6 @@ Token* Scanner::nextToken() {
         if (word == "true") return new Token(Token::TRUE, word, 0, (int)word.size());
         if (word == "false") return new Token(Token::FALSE, word, 0, (int)word.size());
 
-        // listaOf, mutableListOf, val, class, in, step, downTo, etc. se tratan como ID
         return new Token(Token::ID, word, 0, (int)word.size());
     }
 
@@ -118,7 +117,7 @@ Token* Scanner::nextToken() {
 
         case '"': {
             std::string val;
-            // lee hasta la próxima comilla
+
             while (current + 1 < (int)input.size() && input[current+1] != '"') {
                 current++;
                 val += input[current];
@@ -134,7 +133,7 @@ Token* Scanner::nextToken() {
         }
 
         default:
-            // cualquier otro carácter es error
+
             token = new Token(Token::ERR, c);
             break;
     }
@@ -142,7 +141,6 @@ Token* Scanner::nextToken() {
     return token;
 }
 
-// Función de test (opcional)
 void test_scanner(Scanner* scanner) {
     Token* tok;
     cout << "Iniciando Scanner:" << endl << endl;

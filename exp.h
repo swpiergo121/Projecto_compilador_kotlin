@@ -74,8 +74,8 @@ public:
 
 class FCallExp : public Exp {
 public:
-    std::string         name;
-    std::vector<Exp*>   args;
+    std::string name;
+    std::vector<Exp*> args;
     FCallExp(const std::string& name);
     void add(Exp* arg);
     int accept(Visitor* v) override;
@@ -84,8 +84,8 @@ public:
 
 class ListExp : public Exp {
 public:
-    bool                isMutable;
-    std::vector<Exp*>   elements;
+    bool isMutable;
+    std::vector<Exp*> elements;
     ListExp(bool isMutable);
     void add(Exp* elem);
     int accept(Visitor* v) override;
@@ -200,12 +200,12 @@ struct Argument {
 
 class VarDec {
 public:
-    bool              isMutable;
-    std::string       name;
-    std::string       typeName;
-    Exp*              init;    // puede ser nullptr
+    bool isMutable;
+    std::string name;
+    std::string typeName;
+    Exp* init;
     VarDec(bool isMutable, const std::string& name, const std::string& typeName, Exp* init);
-    int accept(Visitor* v);  // <-- sin override
+    int accept(Visitor* v);
     ~VarDec();
 };
 
@@ -214,7 +214,7 @@ public:
     std::vector<VarDec*> vars;
     VarDecList();
     void add(VarDec* var);
-    int accept(Visitor* v);  // <-- sin override
+    int accept(Visitor* v);
     ~VarDecList();
 };
 
@@ -224,7 +224,7 @@ public:
     std::vector<Argument>   args;
     VarDecList*             members;
     ClassDec(const std::string& name, const std::vector<Argument>& args, VarDecList* members);
-    int accept(Visitor* v);  // <-- sin override
+    int accept(Visitor* v);
     ~ClassDec();
 };
 
@@ -233,7 +233,7 @@ public:
     std::vector<ClassDec*> classes;
     ClassDecList();
     void add(ClassDec* cls);
-    int accept(Visitor* v);  // <-- sin override
+    int accept(Visitor* v);
     ~ClassDecList();
 };
 
@@ -244,7 +244,7 @@ public:
     std::vector<Param>    params;
     class Body*           body;
     FunDec(const std::string& name, const std::string& retType, const std::vector<Param>& params, Body* body);
-    int accept(Visitor* v);  // <-- sin override
+    int accept(Visitor* v);
     ~FunDec();
 };
 
@@ -253,7 +253,7 @@ public:
     std::vector<FunDec*> functions;
     FunDecList();
     void add(FunDec* fn);
-    int accept(Visitor* v);  // <-- sin override
+    int accept(Visitor* v);
     ~FunDecList();
 };
 
@@ -262,7 +262,7 @@ public:
     std::vector<Stm*> statements;
     StatementList();
     void add(Stm* stmt);
-    int accept(Visitor* v);  // <-- sin override
+    int accept(Visitor* v);
     ~StatementList();
 };
 
@@ -274,7 +274,7 @@ public:
     VarDecList*     vardecs;
     StatementList*  stmts;
     Body(VarDecList* vardecs, StatementList* stmts);
-    int accept(Visitor* v);  // <-- sin override
+    int accept(Visitor* v);
     ~Body();
 };
 
@@ -283,10 +283,10 @@ public:
     VarDecList*     vardecs;
     ClassDecList*   classDecs;
     FunDecList*     funDecs;
-    Body*           body;       // si vas a usar este campo
+    Body*           body;
     Program(Body* body);
     Program();
-    int accept(Visitor* v);  // <-- sin override
+    int accept(Visitor* v);
     ~Program();
 };
 

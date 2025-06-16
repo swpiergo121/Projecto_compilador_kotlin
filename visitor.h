@@ -7,7 +7,6 @@
 #include <unordered_map>
 #include <string>
 
-// Forward declarations of all AST node types
 class Program;
 class VarDecList;
 class ClassDecList;
@@ -178,7 +177,6 @@ public:
   // Lanza la generación: .data, .text, prologue/epilogue y recorre el programa
   void generate(Program* prog);
 
-  // Reimplementación de todos los visit() de Visitor
   // – Expresiones
   int visit(BinaryExp     *exp) override;
   int visit(IFExp         *exp) override;
@@ -225,9 +223,9 @@ private:
   std::string newLabel(const std::string& prefix);
 
   // para strings en listOf:
-  std::unordered_map<std::string, std::string> stringLabel_;     // literal → label
+  std::unordered_map<std::string, std::string> stringLabel_;     // literal -> label
   // para longitudes:
-  std::unordered_map<std::string, int> listLength_;     // varName → n
+  std::unordered_map<std::string, int> listLength_;     // varName -> n
 
 };
 

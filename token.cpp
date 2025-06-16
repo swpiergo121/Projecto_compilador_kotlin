@@ -15,7 +15,6 @@ Token::Token(Type type, char c)
 Token::Token(Type type, const string &source, int first, int last)
   : type(type)
 {
-    // extrae desde 'first' hasta 'last-1'
     text = source.substr(first, last - first);
 }
 

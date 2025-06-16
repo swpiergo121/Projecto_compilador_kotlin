@@ -68,8 +68,6 @@ void Parser::error(const string& msg) {
 }
 
 // --- Programa principal ---
-// parser.cpp
-
 Program* Parser::parseProgram() {
     DBG("parseProgram — start");
 
@@ -107,11 +105,7 @@ VarDecList* Parser::parseVarDecList() {
 
     while (match(Token::VAR) || match(Token::ID, "val")) {
         bool isMutable = (previous->text == "var");
-
-        // nombre de la variable
         auto varName = consume(Token::ID, "Se esperaba nombre de variable")->text;
-
-        // ':' y tipo (posible genérico)
         consume(Token::COLON, "Se esperaba ':' tras nombre de variable");
         std::string typeName = consume(Token::ID, "Se esperaba tipo")->text;
         if (match(Token::LT)) {
@@ -123,13 +117,11 @@ VarDecList* Parser::parseVarDecList() {
             typeName += ">";
         }
 
-        // inicializador opcional
         Exp* init = nullptr;
         if (match(Token::ASSIGN)) {
             init = parseCExp();
         }
 
-        // ';' final
         consume(Token::PC, "Se esperaba ';' al final de la declaración");
         list->add(new VarDec(isMutable, varName, typeName, init));
     }
@@ -144,11 +136,9 @@ VarDec* Parser::parseVarDec() {
     bool isMutable = match(Token::VAR);
     if (!isMutable && previous && previous->text != "val")
         consume(Token::VAR, "Se esperaba 'var' o 'val'");
-    // nombre y tipo
     auto name = consume(Token::ID, "Se esperaba identificador")->text;
     consume(Token::COLON, "Se esperaba ':' tras nombre de variable");
     auto typeName = consume(Token::ID, "Se esperaba nombre de tipo")->text;
-    // opcional inicializador
     Exp* init = nullptr;
     if (match(Token::ASSIGN)) {
         init = parseCExp();
@@ -194,20 +184,15 @@ ClassDec* Parser::parseClassDec() {
 FunDec* Parser::parseFunDec() {
     if (!match(Token::FUN)) return nullptr;
     DBG("parseFunDec — start");
-
-    // nombre y parámetros
     auto name   = consume(Token::ID, "Se esperaba identificador de función")->text;
     consume(Token::PI, "Se esperaba '(' tras nombre de función");
     auto params = parseParamDecList();
     consume(Token::PD, "Se esperaba ')' tras lista de parámetros");
-
-    // opcional ': TipoRetorno'
     std::string retType;
     if (match(Token::COLON)) {
         retType = consume(Token::ID, "Se esperaba tipo de retorno")->text;
     }
 
-    // cuerpo entre llaves
     consume(Token::LBRACE, "Se esperaba '{' inicio de cuerpo de función");
     Body* body = parseBody();
     consume(Token::RBRACE, "Se esperaba '}' fin de cuerpo de función");
@@ -257,7 +242,6 @@ Body* Parser::parseBody() {
 StatementList* Parser::parseStmtList() {
     DBG("parseStmtList");
     auto sl = new StatementList();
-    // Repetimos hasta encontrar '}' (fin de bloque) o END
     while (!check(Token::RBRACE) && !isAtEnd()) {
         sl->add(parseStmt());
     }
@@ -266,7 +250,6 @@ StatementList* Parser::parseStmtList() {
 
 Stm* Parser::parseStmt() {
     DBG("parseStmt");
-    // Asignación: id '=' CExp ';'
     if (check(Token::ID)) {
         auto id = advance()->text;
         if (match(Token::ASSIGN)) {
@@ -277,7 +260,6 @@ Stm* Parser::parseStmt() {
             error("Después del identificador se esperaba '=' para asignación");
         }
     }
-    // print / println
     if (match(Token::PRINT) || match(Token::ID, "println")) {
         consume(Token::PI, "Se esperaba '(' tras print");
         Exp* e = parseCExp();
@@ -285,7 +267,6 @@ Stm* Parser::parseStmt() {
         consume(Token::PC, "Falta ';' en print");
         return new PrintStatement(e);
     }
-    // return
     if (match(Token::RETURN)) {
         Exp* e = nullptr;
         if (check(Token::PI)) {
@@ -300,7 +281,6 @@ Stm* Parser::parseStmt() {
         consume(Token::PC, "Falta ';' en return");
         return new ReturnStatement(e);
     }
-    // if
     if (match(Token::IF)) {
         consume(Token::PI, "Se esperaba '(' en if");
         auto cond = parseCExp();
@@ -316,7 +296,6 @@ Stm* Parser::parseStmt() {
         }
         return new IfStatement(cond, thenB, elseB);
     }
-    // while
     if (match(Token::WHILE)) {
         consume(Token::PI, "Se esperaba '(' en while");
         auto cond = parseCExp();
@@ -326,11 +305,10 @@ Stm* Parser::parseStmt() {
         consume(Token::RBRACE, "Se esperaba '}' fin while");
         return new WhileStatement(cond, body);
     }
-    // for
     if (match(Token::FOR)) {
         consume(Token::PI, "Se esperaba '(' en for");
         auto iterVar = consume(Token::ID, "Se esperaba identificador en for")->text;
-        consume(Token::ID, "Se esperaba 'in' en for"); // el texto 'in'
+        consume(Token::ID, "Se esperaba 'in' en for");
         Stm* forStmt = nullptr;
         if (check(Token::NUM) || check(Token::PI)) {
             auto loop = parseLoopExp();
@@ -393,16 +371,12 @@ Exp* Parser::parseTerm() {
 
 Exp* Parser::parseFactor() {
     DBG("parseFactor");
-    // literales booleanas
     if (match(Token::TRUE))  return new BoolExp(true);
     if (match(Token::FALSE)) return new BoolExp(false);
-    // cadena de texto
     if (match(Token::STRING)) {
         return new StringExp(previous->text);
     }
-    // número
     if (match(Token::NUM))    return new NumberExp(stoi(previous->text));
-    // lista literal
     if (match(Token::ID, "listOf") || match(Token::ID, "mutableListOf")) {
         bool mut = previous->text == "mutableListOf";
         consume(Token::PI, "Se esperaba '(' en listOf");
@@ -415,7 +389,6 @@ Exp* Parser::parseFactor() {
         consume(Token::PD, "Se esperaba ')' en listOf");
         return le;
     }
-    // llamada o identificador
     if (match(Token::ID)) {
         auto name = previous->text;
         if (match(Token::PI)) {
@@ -428,35 +401,26 @@ Exp* Parser::parseFactor() {
             consume(Token::PD, "Se esperaba ')' en llamada");
             return call;
         }
-        // acceso por índice
         if (match(Token::LBRACK)) {
             auto idx = parseCExp();
             consume(Token::RBRACK, "Se esperaba ']' en index");
             return new IndexExp(name, idx);
         }
-        // acceso por atributo
         if (match(Token::DOT)) {
             auto member = consume(Token::ID, "Se esperaba miembro tras '.'")->text;
             return new DotExp(name, member);
         }
         return new IdentifierExp(name);
     }
-    // inline-if:    if ( CExp ) CExp else CExp
     if ( match(Token::IF) ) {
-        // consu­me “(”
         consume(Token::PI,    "Se esperaba '(' en inline if");
         auto cond     = parseCExp();
-        // consu­me “)”
         consume(Token::PD,    "Se esperaba ')' tras condición de inline if");
-        // entonces
         auto thenExpr = parseCExp();
-        // consu­me la palabra “else”
         consume(Token::ELSE,  "Se esperaba 'else' en inline if");
-        // sino
         auto elseExpr = parseCExp();
         return new IFExp(cond, thenExpr, elseExpr);
     }
-    // paréntesis
     if (match(Token::PI)) {
         auto e = parseCExp();
         consume(Token::PD, "Falta ')'");
@@ -477,7 +441,6 @@ vector<Exp*> Parser::parseArgList() {
 
 LoopExp* Parser::parseLoopExp() {
     DBG("parseLoopExp");
-    // inicio
     auto start = parseCExp();
     bool downTo = match(Token::ID, "downTo");
     if (!downTo) {

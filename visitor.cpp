@@ -121,7 +121,6 @@ int PrintVisitor::visit(IndexExp *e) {
 
 int PrintVisitor::visit(DotExp *e) {
   VDBG("PrintVisitor::visit(DotExp)");
-  // imprime algo como: objeto.campo
   cout << e->object << "." << e->member;
   return 0;
 }
@@ -299,7 +298,6 @@ int EVALVisitor::visit(BinaryExp *exp) {
 
 int EVALVisitor::visit(StringExp *exp) {
   EDBG("EVALVisitor::visit(StringExp)");
-  // built-in print lo mostrará, aquí devolvemos 0
   return 0;
 }
 
@@ -734,7 +732,7 @@ int GenCodeVisitor::visit(IndexExp *e) {
     // 3) Convertir índice en desplazamiento de bytes (= idx * 8)
     out_ << "  salq $3, %rax\n";
 
-    // 4) Sumar desplazamiento al puntero base → %rbx + %rax
+    // 4) Sumar desplazamiento al puntero base -> %rbx + %rax
     out_ << "  addq %rax, %rbx\n";
 
     // 5) Cargar el valor/ptr del elemento en %rax
@@ -761,11 +759,9 @@ int GenCodeVisitor::visit(DotExp *e) {
 int GenCodeVisitor::visit(LoopExp *exp) {
     // Generación mínima: evalúa el inicio y devuelve un valor ficticio
     exp->start->accept(this);
-    // (Aquí podrías generar el código de rango .start,.end,.step)
     return 0;
 }
 
-// Resto de expresiones (IFExp, FCallExp, ListExp, LoopExp) se adaptan similarmente…
 int GenCodeVisitor::visit(IFExp *e) {
   auto Lelse = newLabel("Lelse");
   auto Lend  = newLabel("Lend");
@@ -786,9 +782,8 @@ int GenCodeVisitor::visit(IFExp *e) {
 int GenCodeVisitor::visit(ListExp *e) {
     size_t n = e->elements.size();
 
-    // ── PRIMERA PASADA: recolección de literales sólo de strings ───────────
+    // ── PRIMERA PASADA: recolección de literales sólo de strings
     if (collectingStrings_) {
-        // si es lista de String, guardo el literal para .data
         if (n > 0 && dynamic_cast<StringExp*>(e->elements[0])) {
             for (auto *el : e->elements) {
                 auto txt = static_cast<StringExp*>(el)->value;
@@ -796,11 +791,10 @@ int GenCodeVisitor::visit(ListExp *e) {
                     stringLabel_[txt] = newLabel("str");
             }
         }
-        // y en cualquier caso, NO genero malloc ni llenado de ninguna lista
         return 0;
     }
 
-    // ── SEGUNDA PASADA: generación real dentro de .text ────────────────────
+    // ── SEGUNDA PASADA: generación real dentro de .text
 
     // A) Lista de String: malloc de punteros + llenar con labels
     if (n > 0 && dynamic_cast<StringExp*>(e->elements[0])) {
@@ -830,7 +824,7 @@ int GenCodeVisitor::visit(ListExp *e) {
 int GenCodeVisitor::visit(FCallExp *e) {
   // 1) Evaluar argumentos en orden inverso
   for (int i = int(e->args.size()) - 1; i >= 0; --i) {
-    e->args[i]->accept(this);        // resultado en %rax
+    e->args[i]->accept(this);
     out_ << "  pushq %rax\n";
   }
   // 2) Llamar a la función
@@ -862,7 +856,7 @@ void GenCodeVisitor::visit(AssignStatement *s) {
     out_ << "  movq (%rbx), %rbx\n";               // ptr heap
 
     // b) calcular offset = index * 8
-    idx->index->accept(this);                      // índice → %rax
+    idx->index->accept(this);                      // índice -> %rax
     out_ << "  salq $3, %rax\n";                   // *8
     out_ << "  addq %rax, %rbx\n";                 // &elemento
 
@@ -923,9 +917,9 @@ void GenCodeVisitor::visit(ForStatement *s) {
   // 2) Distinguir rango numérico o lista
   if (auto loop = dynamic_cast<LoopExp*>(s->iterable)) {
     // 2.1) start, end, step
-    loop->start->accept(this); // → %rax
+    loop->start->accept(this); // -> %rax
     out_ << "  movq %rax, " << symtab_[s->varName] << "(%rbp)\n";
-    loop->end->accept(this);   // → %rax
+    loop->end->accept(this);   // -> %rax
     out_ << "  movq %rax, %r11\n";
     if (loop->step) {
       loop->step->accept(this);
@@ -1035,8 +1029,6 @@ void GenCodeVisitor::visit(VarDec *d) {
   }
 }
 
-// visitor.cpp
-
 void GenCodeVisitor::visit(VarDecList *l) {
   for (auto v : l->vars) v->accept(this);
   if (stackSize_ > 0)
@@ -1089,16 +1081,13 @@ void GenCodeVisitor::visit(FunDecList *list) {
 
 void GenCodeVisitor::visit(ClassDec *dec) {
   int offset = 0;
-  // dec->members es un VarDecList*; sus vars son tus campos
   for (auto field : dec->members->vars) {
     structLayouts_[dec->name][field->name] = offset;
     offset += 8;  // asumimos 8 bytes por campo
   }
-  // No emitimos ensamblador aquí, sólo preparamos el layout
 }
 
 void GenCodeVisitor::visit(ClassDecList *list) {
-    // Recorre cada definición de struct/clase
     for (auto cls : list->classes) {
         cls->accept(this);
     }
@@ -1114,7 +1103,6 @@ void GenCodeVisitor::visit(Body *b) {
 }
 
 void GenCodeVisitor::visit(Program *p) {
-  // Solo genera código de funciones (incluye main)
   p->funDecs->accept(this);
 }
 
