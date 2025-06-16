@@ -10,11 +10,12 @@ public:
     enum Type {
         ERR, END,
         ID, NUM,
+        STRING,
         TRUE, FALSE,
         FUN, VAR,
         IF, ELSE, WHILE, FOR, RETURN, PRINT,
         PLUS, MINUS, MUL, DIV,
-        LT, LE, EQ,        // <, <=, ==
+        GT, LT, LE, EQ, GE,        // >, <, <=, ==, >=
         ASSIGN,            // =
         PI, PD,            // '(' , ')'
         LBRACE, RBRACE,    // '{' , '}'

@@ -1,0 +1,9 @@
+val numbers: List<Int> = listOf(1, 2, 3, 4, 5);
+var colors: List<String> = listOf("red", "green", "blue");
+
+fun main() {
+    var idx: Int = 1;
+    println(numbers[idx]);
+    println(colors[2]);
+    return 0;
+}

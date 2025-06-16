@@ -48,16 +48,16 @@ Token* Scanner::nextToken() {
             current++;
         std::string word = input.substr(first, current - first);
 
-        if (word == "print"   || word == "println") return new Token(Token::PRINT,   word, 0, (int)word.size());
-        if (word == "if")                              return new Token(Token::IF,      word, 0, (int)word.size());
-        if (word == "else")                            return new Token(Token::ELSE,   word, 0, (int)word.size());
-        if (word == "while")                           return new Token(Token::WHILE,  word, 0, (int)word.size());
-        if (word == "for")                             return new Token(Token::FOR,    word, 0, (int)word.size());
-        if (word == "var")                             return new Token(Token::VAR,    word, 0, (int)word.size());
-        if (word == "fun")                             return new Token(Token::FUN,    word, 0, (int)word.size());
-        if (word == "return")                          return new Token(Token::RETURN, word, 0, (int)word.size());
-        if (word == "true")                            return new Token(Token::TRUE,   word, 0, (int)word.size());
-        if (word == "false")                           return new Token(Token::FALSE,  word, 0, (int)word.size());
+        if (word == "print"   || word == "println") return new Token(Token::PRINT, word, 0, (int)word.size());
+        if (word == "if") return new Token(Token::IF, word, 0, (int)word.size());
+        if (word == "else") return new Token(Token::ELSE, word, 0, (int)word.size());
+        if (word == "while") return new Token(Token::WHILE, word, 0, (int)word.size());
+        if (word == "for") return new Token(Token::FOR, word, 0, (int)word.size());
+        if (word == "var") return new Token(Token::VAR, word, 0, (int)word.size());
+        if (word == "fun") return new Token(Token::FUN, word, 0, (int)word.size());
+        if (word == "return") return new Token(Token::RETURN, word, 0, (int)word.size());
+        if (word == "true") return new Token(Token::TRUE, word, 0, (int)word.size());
+        if (word == "false") return new Token(Token::FALSE, word, 0, (int)word.size());
 
         // listaOf, mutableListOf, val, class, in, step, downTo, etc. se tratan como ID
         return new Token(Token::ID, word, 0, (int)word.size());
@@ -98,6 +98,15 @@ Token* Scanner::nextToken() {
             }
             break;
 
+        case '>':
+            if (current + 1 < (int)input.size() && input[current+1] == '=') {
+                token = new Token(Token::GE, ">=", 0, 2);
+                current++;
+            } else {
+                token = new Token(Token::GT, ">", 0, 1);
+            }
+            break;
+
         case '<':
             if (current + 1 < (int)input.size() && input[current+1] == '=') {
                 token = new Token(Token::LE, "<=", 0, 2);
@@ -106,6 +115,23 @@ Token* Scanner::nextToken() {
                 token = new Token(Token::LT, "<", 0, 1);
             }
             break;
+
+        case '"': {
+            std::string val;
+            // lee hasta la próxima comilla
+            while (current + 1 < (int)input.size() && input[current+1] != '"') {
+                current++;
+                val += input[current];
+            }
+            if (current + 1 >= (int)input.size()) {
+                const char* msg = "Unterminated string literal";
+                token = new Token(Token::ERR,msg,0,(int)strlen(msg));
+            } else {
+                current++;
+                token = new Token(Token::STRING,val,0,(int)val.size());
+            }
+            break;
+        }
 
         default:
             // cualquier otro carácter es error

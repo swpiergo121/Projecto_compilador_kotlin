@@ -1,0 +1,10 @@
+fun sum(a: Int, b: Int): Int {
+    return a + b;
+}
+
+fun main() {
+    var x: Int = 3;
+    var y: Int = 7;
+    println(sum(x, y));
+    return 0;
+}

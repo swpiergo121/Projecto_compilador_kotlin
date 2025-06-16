@@ -18,7 +18,7 @@ public:
     static std::string binopToChar(int op);
 };
 
-enum BinaryOp { PLUS_OP, MINUS_OP, MUL_OP, DIV_OP, LT_OP, LE_OP, EQ_OP };
+enum BinaryOp { PLUS_OP, MINUS_OP, MUL_OP, DIV_OP, LT_OP, GT_OP, LE_OP, EQ_OP };
 
 class IFExp : public Exp {
 public:
@@ -32,12 +32,20 @@ public:
 
 class BinaryExp : public Exp {
 public:
-    Exp*      left;
-    Exp*      right;
-    BinaryOp  op;
+    Exp* left;
+    Exp* right;
+    BinaryOp op;
     BinaryExp(Exp* left, Exp* right, BinaryOp op);
     int accept(Visitor* v) override;
     ~BinaryExp();
+};
+
+class StringExp : public Exp {
+public:
+  std::string value;
+  StringExp(const std::string &value) : value(value) {}
+  int accept(Visitor* v) override;
+  ~StringExp() override {}
 };
 
 class NumberExp : public Exp {
@@ -87,7 +95,8 @@ public:
 class IndexExp : public Exp {
 public:
     std::string name;
-    Exp*        index;
+    Exp* index;
+    Exp* listExpr;
     IndexExp(const std::string& name, Exp* index);
     int accept(Visitor* v) override;
     ~IndexExp();
@@ -124,9 +133,9 @@ public:
 
 class AssignStatement : public Stm {
 public:
-    std::string target;
-    Exp*        expr;
-    AssignStatement(const std::string& target, Exp* expr);
+    Exp* target;
+    Exp* expr;
+    AssignStatement(Exp* target, Exp* expr);
     int accept(Visitor* v) override;
     ~AssignStatement();
 };
@@ -149,7 +158,7 @@ public:
 
 class IfStatement : public Stm {
 public:
-    Exp*   condition;
+    Exp*   cond;
     class Body* thenBranch;
     class Body* elseBranch;  // puede ser nullptr
     IfStatement(Exp* condition, Body* thenBranch, Body* elseBranch);
@@ -159,7 +168,7 @@ public:
 
 class WhileStatement : public Stm {
 public:
-    Exp*   condition;
+    Exp*   cond;
     class Body* body;
     WhileStatement(Exp* condition, Body* body);
     int accept(Visitor* v) override;
@@ -274,6 +283,8 @@ public:
     VarDecList*     vardecs;
     ClassDecList*   classDecs;
     FunDecList*     funDecs;
+    Body*           body;       // si vas a usar este campo
+    Program(Body* body);
     Program();
     int accept(Visitor* v);  // <-- sin override
     ~Program();

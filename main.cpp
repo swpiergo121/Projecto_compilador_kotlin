@@ -46,6 +46,13 @@ int main(int argc, const char* argv[]) {
         cout  << endl;
         cout << "EJECUTAR:" << endl;
         evalVisitor.ejecutar(program);
+        cout << "Ejecución exitosa" << endl;
+        cout << endl;
+        cout << "Generando código assembly:" << endl;
+        GenCodeVisitor genVisitor(std::cout);
+        genVisitor.generate(program);
+        cout << endl;
+        cout << "Ejecución finalizada con éxito." << endl;
         delete program;
     } catch (const exception& e) {
         cout << "Error durante la ejecución: " << e.what() << endl;

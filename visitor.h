@@ -29,6 +29,7 @@ class ReturnStatement;
 class Exp;
 class BinaryExp;
 class IFExp;
+class StringExp;
 class NumberExp;
 class BoolExp;
 class IdentifierExp;
@@ -44,6 +45,7 @@ public:
   // Expressions
   virtual int  visit(BinaryExp     *exp) = 0;
   virtual int  visit(IFExp         *exp) = 0;
+  virtual int  visit(StringExp     *exp) = 0;
   virtual int  visit(NumberExp     *exp) = 0;
   virtual int  visit(BoolExp       *exp) = 0;
   virtual int  visit(IdentifierExp *exp) = 0;
@@ -88,6 +90,7 @@ public:
 
   int  visit(BinaryExp     *exp) override;
   int  visit(IFExp         *exp) override;
+  int  visit(StringExp     *exp) override;
   int  visit(NumberExp     *exp) override;
   int  visit(BoolExp       *exp) override;
   int  visit(IdentifierExp *exp) override;
@@ -125,12 +128,17 @@ class EVALVisitor : public Visitor {
   std::unordered_map<std::string, FunDec*> fdecs;
   int                              retval;
   bool                             retflag;
+  // Heap interno para literales de lista
+  std::unordered_map<int, std::vector<int>> listHeap;
+  std::unordered_map<int, std::vector<std::string>> stringListHeap;
+  int nextListId = 1;
 
 public:
   void ejecutar(Program *program);
 
   int  visit(BinaryExp     *exp) override;
   int  visit(IFExp         *exp) override;
+  int  visit(StringExp     *exp) override;
   int  visit(NumberExp     *exp) override;
   int  visit(BoolExp       *exp) override;
   int  visit(IdentifierExp *exp) override;
@@ -158,5 +166,70 @@ public:
   void visit(Body          *body)override;
   void visit(Program       *prog)override;
 };
+
+//----------------------------------------------------------------------
+// GenCodeVisitor: genera ensamblador x86-64 recorriendo el AST
+//----------------------------------------------------------------------
+
+class GenCodeVisitor : public Visitor {
+public:
+  explicit GenCodeVisitor(std::ostream& out);
+
+  // Lanza la generación: .data, .text, prologue/epilogue y recorre el programa
+  void generate(Program* prog);
+
+  // Reimplementación de todos los visit() de Visitor
+  // – Expresiones
+  int visit(BinaryExp     *exp) override;
+  int visit(IFExp         *exp) override;
+  int visit(StringExp     *exp) override;
+  int visit(NumberExp     *exp) override;
+  int visit(BoolExp       *exp) override;
+  int visit(IdentifierExp *exp) override;
+  int visit(FCallExp      *exp) override;
+  int visit(ListExp       *exp) override;
+  int visit(IndexExp      *exp) override;
+  int visit(DotExp        *exp) override;
+  int visit(LoopExp       *exp) override;
+
+  // – Sentencias / declaraciones
+  void visit(AssignStatement *stm) override;
+  void visit(PrintStatement  *stm) override;
+  void visit(IfStatement     *stm) override;
+  void visit(WhileStatement  *stm) override;
+  void visit(ForStatement    *stm) override;
+  void visit(ReturnStatement *stm) override;
+
+  void visit(VarDec       *dec) override;
+  void visit(VarDecList   *list)override;
+  void visit(ClassDec     *dec) override;
+  void visit(ClassDecList *list)override;
+  void visit(FunDec       *dec) override;
+  void visit(FunDecList   *list)override;
+
+  void visit(StatementList *list)override;
+  void visit(Body          *body)override;
+  void visit(Program       *prog)override;
+
+private:
+  std::ostream& out_;
+  std::unordered_map<std::string,int> symtab_;
+  int stackSize_ = 0;
+  int labelCount_ = 0;
+  bool inGlobal_ = false;
+  std::vector<VarDec*> globalVars_; 
+  bool collectingStrings_ = false;
+
+  std::unordered_map<std::string, std::string> varTypes_;
+  std::unordered_map<std::string,std::unordered_map<std::string,int>> structLayouts_;
+  std::string newLabel(const std::string& prefix);
+
+  // para strings en listOf:
+  std::unordered_map<std::string, std::string> stringLabel_;     // literal → label
+  // para longitudes:
+  std::unordered_map<std::string, int> listLength_;     // varName → n
+
+};
+
 
 #endif // VISITOR_H

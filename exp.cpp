@@ -1,12 +1,20 @@
 // exp.cpp
 #include "exp.h"
+#include "visitor.h"
 
-// Program
-Program::Program() : vardecs(nullptr), classDecs(nullptr), funDecs(nullptr) {}
+using namespace std;
+
+Program::Program(Body* b)
+  : vardecs(nullptr)
+  , classDecs(nullptr)
+  , funDecs(nullptr)
+  , body(b)
+{}
+
 Program::~Program() {
-    delete vardecs;
-    delete classDecs;
-    delete funDecs;
+  delete vardecs;
+  delete classDecs;
+  delete funDecs;
 }
 
 // VarDecList
@@ -65,9 +73,13 @@ void StatementList::add(Stm* stmt) {
 Stm::~Stm() {}
 
 // AssignStatement
-AssignStatement::AssignStatement(const string& target, Exp* expr)
+AssignStatement::AssignStatement(Exp* target, Exp* expr)
   : target(target), expr(expr) {}
 
+AssignStatement::~AssignStatement() {
+  delete target;
+  delete expr;
+}
 // PrintStatement
 PrintStatement::PrintStatement(Exp* expr)
   : expr(expr) {}
@@ -88,17 +100,13 @@ WhileStatement::WhileStatement(Exp* cond, Body* body)
 ForStatement::ForStatement(const string& varName, Exp* iterable, Body* body)
   : varName(varName), iterable(iterable), body(body) {}
 
-// Exp base
-Exp::~Exp() {}
-
 // BinaryExp
-BinaryExp::BinaryExp(Exp* left, Exp* right, int op)
+BinaryExp::BinaryExp(Exp* left, Exp* right, BinaryOp op)
   : left(left), right(right), op(op) {}
 
 // IFExp
-IFExp::IFExp(Exp* cond, Exp* thenExp, Exp* elseExp)
-  : cond(cond), thenExp(thenExp), elseExp(elseExp) {}
-
+IFExp::IFExp(Exp* cond, Exp* left, Exp* right)
+  : cond(cond), left(left), right(right) {}
 // NumberExp
 NumberExp::NumberExp(int value)
   : value(value) {}
@@ -136,3 +144,47 @@ DotExp::DotExp(const string& object, const string& member)
 // LoopExp
 LoopExp::LoopExp(Exp* start, Exp* end, Exp* step, bool downTo)
   : start(start), end(end), step(step), downTo(downTo) {}
+
+int StringExp::accept(Visitor* v) {
+  return v->visit(this);
+}
+
+// Exp base
+Exp::~Exp() {}
+
+std::string Exp::binopToChar(int op) {
+  switch (op) {
+    case PLUS_OP:  return "+";
+    case MINUS_OP: return "-";
+    case MUL_OP:   return "*";
+    case DIV_OP:   return "/";
+    case LT_OP:    return "<";
+    case GT_OP:    return ">";
+    default:       return "?";
+  }
+}
+
+// Expressions
+IFExp::~IFExp()          { delete cond; delete left; delete right; }
+BinaryExp::~BinaryExp()  { delete left; delete right; }
+NumberExp::~NumberExp()  {}
+BoolExp::~BoolExp()      {}
+IdentifierExp::~IdentifierExp() {}
+FCallExp::~FCallExp()    { for (auto a: args) delete a; }
+ListExp::~ListExp()      { for (auto e: elements) delete e; }
+IndexExp::~IndexExp()    { delete index; }
+DotExp::~DotExp()        {}
+LoopExp::~LoopExp()      { delete start; delete end; if (step) delete step; }
+
+// Statements
+PrintStatement::~PrintStatement() { delete expr; }
+ReturnStatement::~ReturnStatement(){ if (expr) delete expr; }
+IfStatement::~IfStatement()       { delete cond; delete thenBranch; if (elseBranch) delete elseBranch; }
+WhileStatement::~WhileStatement() { delete cond; delete body; }
+ForStatement::~ForStatement()     { delete iterable; delete body; }
+
+// Declarations
+VarDec::~VarDec()     { if (init) delete init; }
+ClassDec::~ClassDec() { delete members; }
+FunDec::~FunDec()     { delete body; }
+Body::~Body()         { delete vardecs; delete stmts; }
