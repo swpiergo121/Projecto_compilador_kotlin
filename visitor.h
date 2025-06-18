@@ -132,6 +132,13 @@ class EVALVisitor : public Visitor {
   std::unordered_map<int, std::vector<std::string>> stringListHeap;
   int nextListId = 1;
 
+  // Para asignar IDs únicos a cada instancia
+  int nextObjectId = 1;
+  // Para saber el orden de los campos de cada clase
+  std::unordered_map<std::string, std::vector<std::string>> classFields_;
+  // “Heap” de objetos: objectId -> map(campo -> valor)
+  std::unordered_map<int, std::unordered_map<std::string,int>> objectHeap;
+
 public:
   void ejecutar(Program *program);
 

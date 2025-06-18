@@ -3,12 +3,6 @@
 #include <stdexcept>
 #include <iostream>
 
-#define DBG(msg) \
-  cerr << "[DBG] " << msg \
-       << " -- current=" << current->text \
-       << " (" << current->type << ")" << endl;
-
-
 using namespace std;
 
 Parser::Parser(Scanner* sc)
@@ -21,7 +15,6 @@ Parser::Parser(Scanner* sc)
 }
 
 Program* Parser::parse() {
-    DBG("parse");
     return parseProgram();
 }
 
@@ -69,8 +62,6 @@ void Parser::error(const string& msg) {
 
 // --- Programa principal ---
 Program* Parser::parseProgram() {
-    DBG("parseProgram — start");
-
     // 1) variables globales
     VarDecList* globals  = parseVarDecList();
 
@@ -94,13 +85,11 @@ Program* Parser::parseProgram() {
         }
     }
 
-    DBG("parseProgram — end");
     return prog;
 }
 
 // --- Declaraciones de variables ---
 VarDecList* Parser::parseVarDecList() {
-    DBG("parseVarDecList — start");
     auto list = new VarDecList();
 
     while (match(Token::VAR) || match(Token::ID, "val")) {
@@ -126,13 +115,11 @@ VarDecList* Parser::parseVarDecList() {
         list->add(new VarDec(isMutable, varName, typeName, init));
     }
 
-    DBG("parseVarDecList — end, current=" + current->text);
     return list;
 }
 
 
 VarDec* Parser::parseVarDec() {
-    DBG("parseVarDec");
     bool isMutable = match(Token::VAR);
     if (!isMutable && previous && previous->text != "val")
         consume(Token::VAR, "Se esperaba 'var' o 'val'");
@@ -150,16 +137,16 @@ VarDec* Parser::parseVarDec() {
 // --- Declaraciones de clase ---
 
 ClassDecList* Parser::parseClassDecList() {
-    DBG("parseClassDecList");
     auto list = new ClassDecList();
-    while (match(Token::ID, "class")) {
+    // Mientras veamos la palabra “class”
+    while (check(Token::ID) && current->text == "class") {
+        advance();  // consumimos “class”
         list->add(parseClassDec());
     }
     return list;
 }
 
 FunDecList* Parser::parseFunDecList() {
-    DBG("parseFunDecList");
     auto list = new FunDecList();
     FunDec* f;
     while ((f = parseFunDec()) != nullptr) {
@@ -169,21 +156,22 @@ FunDecList* Parser::parseFunDecList() {
 }
 
 ClassDec* Parser::parseClassDec() {
-    DBG("parseClassDec");
-    auto name = consume(Token::ID, "Se esperaba nombre de clase")->text;
+    auto name = consume(Token::ID,"Se esperaba nombre de clase")->text;
+    // 2) paréntesis con parámetros
     consume(Token::PI, "Se esperaba '(' tras nombre de clase");
     auto args = parseArguments();
-    consume(Token::PD, "Se esperaba ')' tras argumentos");
+    consume(Token::PD, "Se esperaba ')' tras argumentos de clase");
+    // 3) cuerpo de la clase
     consume(Token::LBRACE, "Se esperaba '{' inicio de cuerpo de clase");
     auto members = parseVarDecList();
     consume(Token::RBRACE, "Se esperaba '}' fin de cuerpo de clase");
+
     return new ClassDec(name, *args, members);
 }
 
 // --- Declaraciones de función ---
 FunDec* Parser::parseFunDec() {
     if (!match(Token::FUN)) return nullptr;
-    DBG("parseFunDec — start");
     auto name   = consume(Token::ID, "Se esperaba identificador de función")->text;
     consume(Token::PI, "Se esperaba '(' tras nombre de función");
     auto params = parseParamDecList();
@@ -197,12 +185,10 @@ FunDec* Parser::parseFunDec() {
     Body* body = parseBody();
     consume(Token::RBRACE, "Se esperaba '}' fin de cuerpo de función");
 
-    DBG("parseFunDec — end");
     return new FunDec(name, retType, *params, body);
 }
 
 vector<Param>* Parser::parseParamDecList() {
-    DBG("parseParamDecList");
     auto params = new vector<Param>();
     if (check(Token::ID)) {
         do {
@@ -215,23 +201,43 @@ vector<Param>* Parser::parseParamDecList() {
     return params;
 }
 
-vector<Argument>* Parser::parseArguments() {
-    DBG("parseArguments");
-    auto args = new vector<Argument>();
+// —————————————
+// parseArguments: lista de x:Type [, y:Type]*
+// —————————————
+std::vector<Argument>* Parser::parseArguments() {
+    auto args = new std::vector<Argument>();
+
+    // si no hay ningún parámetro, devolvemos lista vacía
+    if (!check(Token::ID)) {
+        return args;
+    }
+
     do {
-        consume(Token::ID, "Se esperaba 'val' en argumento de clase");
-        auto aname = consume(Token::ID, "Se esperaba nombre de argumento")->text;
-        consume(Token::COLON, "Se esperaba ':' tras nombre de argumento");
-        auto atype = consume(Token::ID, "Se esperaba tipo de argumento")->text;
+        // nombre
+        auto aname = consume(Token::ID,"Se esperaba nombre de argumento")->text;
+        // dos puntos y tipo
+        consume(Token::COLON,"Se esperaba ':' tras nombre de argumento");
+        auto atype = consume(Token::ID,"Se esperaba tipo de argumento")->text;
+
+        // soportar genéricos List<...>, Point<...>, etc.
+        if (match(Token::LT)) {
+            atype += "<" + consume(Token::ID,"Se esperaba tipo genérico")->text;
+            while (match(Token::COMA)) {
+                atype += "," + consume(Token::ID,"Se esperaba tipo genérico")->text;
+            }
+            consume(Token::GT,"Se esperaba '>' al final de tipo genérico");
+            atype += ">";
+        }
+
         args->push_back({aname, atype});
     } while (match(Token::COMA));
+
     return args;
 }
 
 // --- Cuerpo y sentencias ---
 
 Body* Parser::parseBody() {
-    DBG("parseBody");
     auto vdl = parseVarDecList();
     auto sl  = parseStmtList();
     return new Body(vdl, sl);
@@ -240,7 +246,6 @@ Body* Parser::parseBody() {
 // --- Cuerpo y sentencias ---
 
 StatementList* Parser::parseStmtList() {
-    DBG("parseStmtList");
     auto sl = new StatementList();
     while (!check(Token::RBRACE) && !isAtEnd()) {
         sl->add(parseStmt());
@@ -249,7 +254,6 @@ StatementList* Parser::parseStmtList() {
 }
 
 Stm* Parser::parseStmt() {
-    DBG("parseStmt");
     if (check(Token::ID)) {
         auto id = advance()->text;
         if (match(Token::ASSIGN)) {
@@ -334,7 +338,6 @@ Stm* Parser::parseStmt() {
 // --- Expresiones ---
 
 Exp* Parser::parseCExp() {
-    DBG("parseCExp");
     auto left = parseExpression();
     if (match(Token::GT) || match(Token::LT) || match(Token::LE) || match(Token::EQ)) {
         auto op = previous->type == Token::GT ? GT_OP
@@ -348,7 +351,6 @@ Exp* Parser::parseCExp() {
 }
 
 Exp* Parser::parseExpression() {
-    DBG("parseExpression");
     auto left = parseTerm();
     while (match(Token::PLUS) || match(Token::MINUS)) {
         auto op = previous->type == Token::PLUS ? PLUS_OP : MINUS_OP;
@@ -359,7 +361,6 @@ Exp* Parser::parseExpression() {
 }
 
 Exp* Parser::parseTerm() {
-    DBG("parseTerm");
     auto left = parseFactor();
     while (match(Token::MUL) || match(Token::DIV)) {
         auto op = previous->type == Token::MUL ? MUL_OP : DIV_OP;
@@ -370,7 +371,6 @@ Exp* Parser::parseTerm() {
 }
 
 Exp* Parser::parseFactor() {
-    DBG("parseFactor");
     if (match(Token::TRUE))  return new BoolExp(true);
     if (match(Token::FALSE)) return new BoolExp(false);
     if (match(Token::STRING)) {
@@ -431,7 +431,6 @@ Exp* Parser::parseFactor() {
 }
 
 vector<Exp*> Parser::parseArgList() {
-    DBG("parseArgList");
     vector<Exp*> elems;
     do {
         elems.push_back(parseCExp());
@@ -440,7 +439,6 @@ vector<Exp*> Parser::parseArgList() {
 }
 
 LoopExp* Parser::parseLoopExp() {
-    DBG("parseLoopExp");
     auto start = parseCExp();
     bool downTo = match(Token::ID, "downTo");
     if (!downTo) {

@@ -5,10 +5,6 @@
 
 using namespace std;
 
-#define VDBG(msg) cerr << "[VDBG] " << msg << endl;
-#define EDBG(msg) \
-  cerr << "[EDBG] " << msg << endl;
-
 //------------------------------------------------------------
 // Accept hooks for Exp and Stm (if not already in exp.cpp)
 //------------------------------------------------------------
@@ -47,13 +43,11 @@ int Program::accept(Visitor *v)          { v->visit(this); return 0; }
 //----------------------------------------------------------------------
 
 void PrintVisitor::imprimir(Program *p) {
-  VDBG("PrintVisitor::imprimir(Program)");
   p->accept(this);
   cout << endl;
 }
 
 int PrintVisitor::visit(BinaryExp *e) {
-  VDBG("PrintVisitor::visit(BinaryExp)");
   e->left->accept(this);
   cout << " " << Exp::binopToChar(e->op) << " ";
   e->right->accept(this);
@@ -61,7 +55,6 @@ int PrintVisitor::visit(BinaryExp *e) {
 }
 
 int PrintVisitor::visit(IFExp *e) {
-  VDBG("PrintVisitor::visit(IFExp)");
   cout << "if("; e->cond->accept(this);
   cout << "){";
   e->left->accept(this);
@@ -72,24 +65,20 @@ int PrintVisitor::visit(IFExp *e) {
 }
 
 int PrintVisitor::visit(StringExp *exp) {
-  VDBG("PrintVisitor::visit(StringExp)");
   cout << '"' << exp->value << '"';
   return 0;
 }
 
 int PrintVisitor::visit(NumberExp *e)  { 
-  VDBG("PrintVisitor::visit(NumberExp)");
   cout << e->value; 
   return 0; }
 
 int PrintVisitor::visit(BoolExp *e) { 
-  VDBG("PrintVisitor::visit(BoolExp)");
   cout << (e->value ? "true" : "false"); 
   return 0; }
 int PrintVisitor::visit(IdentifierExp *e) { cout << e->name; return 0; }
 
 int PrintVisitor::visit(FCallExp *e) {
-  VDBG("PrintVisitor::visit(FCallExp)");
   cout << e->name << "(";
   for (size_t i = 0; i < e->args.size(); ++i) {
     e->args[i]->accept(this);
@@ -100,7 +89,6 @@ int PrintVisitor::visit(FCallExp *e) {
 }
 
 int PrintVisitor::visit(ListExp *e) {
-  VDBG("PrintVisitor::visit(ListExp)");
   cout << (e->isMutable ? "mutableListOf(" : "listOf(");
   for (size_t i = 0; i < e->elements.size(); ++i) {
     e->elements[i]->accept(this);
@@ -111,7 +99,6 @@ int PrintVisitor::visit(ListExp *e) {
 }
 
 int PrintVisitor::visit(IndexExp *e) {
-  VDBG("PrintVisitor::visit(IndexExp)");
   // imprime algo como: lista[indice]
   cout << e->name << "[";
   e->index->accept(this);
@@ -120,7 +107,6 @@ int PrintVisitor::visit(IndexExp *e) {
 }
 
 int PrintVisitor::visit(DotExp *e) {
-  VDBG("PrintVisitor::visit(DotExp)");
   cout << e->object << "." << e->member;
   return 0;
 }
@@ -137,26 +123,22 @@ int PrintVisitor::visit(LoopExp *e) {
 }
 
 void PrintVisitor::visit(AssignStatement *s) {
-  VDBG("PrintVisitor::visit(AssignStatement)");
   cout << s->target << " = ";
   s->expr->accept(this);
   cout << ";" << endl;
 }
 
 void PrintVisitor::visit(PrintStatement *s) {
-  VDBG("PrintVisitor::visit(PrintStatement)");
   cout << "print("; s->expr->accept(this); cout << ");" << endl;
 }
 
 void PrintVisitor::visit(ReturnStatement *s) {
-  VDBG("PrintVisitor::visit(ReturnStatement)");
   cout << "return";
   if (s->expr) { cout << " "; s->expr->accept(this); }
   cout << ";" << endl;
 }
 
 void PrintVisitor::visit(IfStatement *s) {
-  VDBG("PrintVisitor::visit(IfStatement)");
   cout << "if "; s->cond->accept(this); cout << " {" << endl;
     s->thenBranch->accept(this);
   cout << "}";
@@ -169,14 +151,12 @@ void PrintVisitor::visit(IfStatement *s) {
 }
 
 void PrintVisitor::visit(WhileStatement *s) {
-  VDBG("PrintVisitor::visit(WhileStatement)");
   cout << "while "; s->cond->accept(this); cout << " {" << endl;
     s->body->accept(this);
   cout << "}" << endl;
 }
 
 void PrintVisitor::visit(ForStatement *s) {
-  VDBG("PrintVisitor::visit(ForStatement)");
   cout << "for(" << s->varName << " in ";
   s->iterable->accept(this);
   cout << ") {" << endl;
@@ -185,7 +165,6 @@ void PrintVisitor::visit(ForStatement *s) {
 }
 
 void PrintVisitor::visit(VarDec *d) {
-  VDBG("PrintVisitor::visit(VarDec)");
   cout << (d->isMutable ? "var " : "val ")
        << d->typeName << " " << d->name;
   if (d->init) { cout << " = "; d->init->accept(this); }
@@ -193,13 +172,11 @@ void PrintVisitor::visit(VarDec *d) {
 }
 
 void PrintVisitor::visit(VarDecList *list) {
-  VDBG("PrintVisitor::visit(VarDecList)");
   for (auto dec : list->vars)
     dec->accept(this);
 }
 
 void PrintVisitor::visit(ClassDec *c) {
-  VDBG("PrintVisitor::visit(ClassDec)");
   cout << "class " << c->name << "(";
   for (size_t i = 0; i < c->args.size(); ++i) {
     cout << c->args[i].name << ":" << c->args[i].type;
@@ -211,12 +188,10 @@ void PrintVisitor::visit(ClassDec *c) {
 }
 
 void PrintVisitor::visit(ClassDecList *l) {
-  VDBG("PrintVisitor::visit(ClassDecList)");
   for (auto c : l->classes) c->accept(this);
 }
 
 void PrintVisitor::visit(FunDec *f) {
-  VDBG("PrintVisitor::visit(FunDec)");
   cout << "fun " << f->name << "(";
   for (size_t i = 0; i < f->params.size(); ++i) {
     cout << f->params[i].name << ":" << f->params[i].type;
@@ -228,23 +203,19 @@ void PrintVisitor::visit(FunDec *f) {
 }
 
 void PrintVisitor::visit(FunDecList *l) {
-  VDBG("PrintVisitor::visit(FunDecList)");
   for (auto f : l->functions) f->accept(this);
 }
 
 void PrintVisitor::visit(StatementList *l) {
-  VDBG("PrintVisitor::visit(StatementList)");
   for (auto s : l->statements) s->accept(this);
 }
 
 void PrintVisitor::visit(Body *b) {
-  VDBG("PrintVisitor::visit(Body)");
   b->vardecs->accept(this);
   b->stmts->accept(this);
 }
 
 void PrintVisitor::visit(Program *p) {
-  VDBG("PrintVisitor::visit(Program)");
   if (p->body)
     p->body->accept(this);
 }
@@ -269,6 +240,8 @@ void EVALVisitor::ejecutar(Program *p) {
 
   // 4) Ejecuta main
   retflag = false;
+  if (p->classDecs) p->classDecs->accept(this);
+  if (p->funDecs)   p->funDecs->accept(this);
   p->body->accept(this);
 
   // 5) Sal del scope global
@@ -297,7 +270,6 @@ int EVALVisitor::visit(BinaryExp *exp) {
 }
 
 int EVALVisitor::visit(StringExp *exp) {
-  EDBG("EVALVisitor::visit(StringExp)");
   return 0;
 }
 
@@ -305,18 +277,30 @@ int EVALVisitor::visit(NumberExp *exp) { return exp->value; }
 int EVALVisitor::visit(BoolExp   *exp) { return exp->value; }
 
 int EVALVisitor::visit(IdentifierExp *exp) {
-  EDBG("visit IdentifierExp: " + exp->name);
   if (!env.check(exp->name)) {
     cout << "Variable no declarada: " << exp->name << endl;
-    cerr << "[EDBG] ⚠ Variable no declarada (en Exp): " << exp->name << endl;
     return 0;
   }
   int r = env.lookup(exp->name);
-  EDBG(" → lookup " + exp->name + " = " + to_string(r));
   return env.lookup(exp->name);
 }
 
 int EVALVisitor::visit(FCallExp *exp) {
+  // 0) Constructor de struct/clase
+  auto itFields = classFields_.find(exp->name);
+  if (itFields != classFields_.end()) {
+    // 1) Nuevo objectId
+    int objId = nextObjectId++;
+    // 2) Evaluar cada argumento y asignarlo al campo correspondiente
+    auto &fields = itFields->second;
+    for (size_t i = 0; i < exp->args.size(); ++i) {
+      int val = exp->args[i]->accept(this);
+      objectHeap[objId][ fields[i] ] = val;
+    }
+    // 3) Guardar el objId en el entorno local (por ejemplo, como Int)
+    return objId;
+  }
+
   // 1) Built-in: print / println
   if (exp->name == "print" || exp->name == "println") {
     for (auto arg : exp->args) {
@@ -427,10 +411,18 @@ int EVALVisitor::visit(IndexExp *exp) {
 }
 
 int EVALVisitor::visit(DotExp *exp) {
-  std::cerr<<"Error: acceso a campos no implementado: "
-           <<exp->object<<"."<<exp->member<<"\n";
-  std::exit(1);
+  // 1) obtenemos el objectId (se guardó como variable entera)
+  int objId = env.lookup(exp->object);
+  // 2) buscamos el campo
+  auto &fields = objectHeap[objId];
+  if (!fields.count(exp->member)) {
+    std::cerr << "Error: campo '" << exp->member
+              << "' no existe en " << exp->object << "\n";
+    std::exit(1);
+  }
+  return fields[exp->member];
 }
+
 
 int EVALVisitor::visit(IFExp *exp) {
   if (exp->cond->accept(this))
@@ -450,13 +442,7 @@ int EVALVisitor::visit(LoopExp *exp) {
 }
 
 void EVALVisitor::visit(AssignStatement *stm) {
-    if (auto id = dynamic_cast<IdentifierExp*>(stm->target)) {
-      EDBG("visit AssignStatement, identificador = " + id->name);
-    } else {
-      EDBG("visit AssignStatement, LHS no es identificador");
-    }
     int val = stm->expr->accept(this);
-    EDBG(" → valor RHS = " + to_string(val));
     if (auto id = dynamic_cast<IdentifierExp*>(stm->target)) {
         const std::string &name = id->name;
 
@@ -539,26 +525,28 @@ void EVALVisitor::visit(ForStatement *stm) {
 }
 
 void EVALVisitor::visit(VarDec *dec) {
-  EDBG("visit VarDec: agregar variable '" + dec->name + "' de tipo '" + dec->typeName + "'");
   // 1) la declaro con valor basura o 0
   env.add_var(dec->name, dec->typeName);
 
   // 2) si tenía inicializador, lo evalúo y actualizo
   if (dec->init) {
     int v = dec->init->accept(this);
-    EDBG(" → init '" + dec->name + "' = " + to_string(v));
     env.update(dec->name, v);
   }
 }
 
 void EVALVisitor::visit(VarDecList *list) {
-  EDBG("visit VarDecList");
   for (auto dec : list->vars)
     dec->accept(this);
 }
 
 void EVALVisitor::visit(ClassDec *dec) {
-  // class definitions ignored at runtime
+  // Guarda el orden de los campos tal como aparecen
+  std::vector<std::string> fields;
+  for (auto var : dec->members->vars) {
+    fields.push_back(var->name);
+  }
+  classFields_[dec->name] = std::move(fields);
 }
 
 void EVALVisitor::visit(ClassDecList *list) {
@@ -576,16 +564,12 @@ void EVALVisitor::visit(FunDecList *list) {
 }
 
 void EVALVisitor::visit(StatementList *list) {
-  EDBG("visit StatementList");
   for (auto s : list->statements) s->accept(this);
 }
 
 void EVALVisitor::visit(Body *body) {
-  EDBG("visit Body");
   env.add_level();
-  EDBG(" → visitar VarDecList");
   body->vardecs->accept(this);
-  EDBG(" → visitar StatementList");
   body->stmts->accept(this);
   env.remove_level();
 }
@@ -623,6 +607,8 @@ void GenCodeVisitor::generate(Program* prog) {
   inGlobal_ = true;
   prog->vardecs->accept(this);
   inGlobal_ = false;
+
+  prog->classDecs->accept(this);
 
   out_ << "\n.text\n";
   // Declaramos cada función:
@@ -742,19 +728,22 @@ int GenCodeVisitor::visit(IndexExp *e) {
 }
 
 int GenCodeVisitor::visit(DotExp *e) {
-  // 1) Dirección base del objeto struct en la pila
-  int offObj = symtab_.at(e->object);
-  out_ << "  lea " << offObj << "(%rbp), %rax\n";
-
-  // 2) Averiguar su tipo y buscar el offset del campo
+  // 1) cargar ptr de la variable (local o global)
+  if (symtab_.count(e->object)) {
+    int off = symtab_.at(e->object);
+    out_ << "  movq " << off << "(%rbp), %rax\n";
+  } else {
+    out_ << "  movq " << e->object << "(%rip), %rax\n";
+  }
+  // 2) offset del campo
   auto structType = varTypes_.at(e->object);
-  int fieldOffset = structLayouts_.at(structType).at(e->member);
-
-  // 3) Sumar offset y cargar valor
-  out_ << "  addq $" << fieldOffset << ", %rax\n";
-  out_ << "  movq (%rax), %rax\n";
+  int fldOff = structLayouts_.at(structType).at(e->member);
+  // 3) cargar campo
+  out_ << "  addq $" << fldOff << ", %rax\n"
+       << "  movq (%rax), %rax\n";
   return 0;
 }
+
 
 int GenCodeVisitor::visit(LoopExp *exp) {
     // Generación mínima: evalúa el inicio y devuelve un valor ficticio
@@ -822,17 +811,37 @@ int GenCodeVisitor::visit(ListExp *e) {
 }
 
 int GenCodeVisitor::visit(FCallExp *e) {
-  // 1) Evaluar argumentos en orden inverso
+  // 0) Constructor de struct/clase si existe layout
+  auto it = structLayouts_.find(e->name);
+  if (it != structLayouts_.end()) {
+    // número de campos
+    int nFields = (int)it->second.size();
+    // malloc(nFields*8)
+    out_ << "  movq $" << (nFields * 8) << ", %rdi\n"
+         << "  call malloc@PLT\n"
+         << "  movq %rax, %rbx\n";
+    // llenar cada campo: args[i] → offset i*8
+    for (size_t i = 0; i < e->args.size(); ++i) {
+      e->args[i]->accept(this);    // → %rax = valor de arg
+      out_ << "  movq %rax, " << (i * 8) << "(%rbx)\n";
+    }
+    // devolver puntero al objeto en %rax
+    out_ << "  movq %rbx, %rax\n";
+    return 0;
+  }
+
+  // — resto de llamadas (print, funciones…) —
+  // 1) Evaluar argumentos en pila
   for (int i = int(e->args.size()) - 1; i >= 0; --i) {
     e->args[i]->accept(this);
     out_ << "  pushq %rax\n";
   }
-  // 2) Llamar a la función
+  // 2) Llamada a función externa/usuario
   out_ << "  call " << e->name << "@PLT\n";
-  // 3) Limpiar la pila
+  // 3) Limpiar pila
   if (!e->args.empty())
     out_ << "  addq $" << (e->args.size() * 8) << ", %rsp\n";
-  // Resultado ya está en %rax
+  // Resultado en %rax
   return 0;
 }
 
@@ -999,81 +1008,83 @@ void GenCodeVisitor::visit(ForStatement *s) {
 
 void GenCodeVisitor::visit(VarDec *d) {
   if (inGlobal_) {
-    // 1) sección de datos: label + quad con valor inicial o 0
+    // --- globales en .data ---
     out_ << d->name << ": .quad ";
-    if (d->init) {
-      if (auto num = dynamic_cast<NumberExp*>(d->init)) {
-        out_ << num->value;
-      } else {
-        // por ahora, sólo soportamos inicializadores numéricos
-        out_ << "0";
-      }
+    if (auto num = dynamic_cast<NumberExp*>(d->init)) {
+      out_ << num->value;
     } else {
       out_ << "0";
     }
     out_ << "\n";
-  } else if (d->init) {
+    return;
+  }
+
+  // --- variable LOCAL: reservar espacio ---
+  stackSize_ += 8;
+  symtab_[d->name]   = -stackSize_;
+  varTypes_[d->name] = d->typeName;
+
+  // --- si hay inicializador, generar código para ello ---
+  if (d->init) {
+    // 1) evaluamos la expresión de init, queda en %rax
+    d->init->accept(this);
+
+    // 2) almacenamos %rax en el offset correspondiente
+    out_ << "  movq %rax, " << symtab_[d->name] << "(%rbp)\n";
+
+    // 3) si fuera lista, también guardamos su longitud
     if (auto le = dynamic_cast<ListExp*>(d->init)) {
-      // genera malloc+store pointers (reutiliza la lógica de abajo)
-      le->accept(this);                
-      // resultado: puntero en %rax → lo guardamos en la var
-      out_ << "  movq %rax, " << symtab_[d->name] << "(%rbp)\n";
       listLength_[d->name] = (int)le->elements.size();
-      return;
     }
-  } else {
-    // 2) variable local: reserva 8 bytes en el stack frame
-    stackSize_ += 8;
-    symtab_[d->name]   = -stackSize_;
-    varTypes_[d->name] = d->typeName;
   }
 }
 
 void GenCodeVisitor::visit(VarDecList *l) {
   for (auto v : l->vars) v->accept(this);
-  if (stackSize_ > 0)
-    out_ << "  subq $" << stackSize_ << ", %rsp\n";
 }
 
 void GenCodeVisitor::visit(FunDec *f) {
-  // --- etiqueta y prologue ---
-  out_ << f->name << ":\n";
-  out_ << "  pushq %rbp\n";
-  out_ << "  movq %rsp, %rbp\n";
+  out_ << f->name << ":\n"
+       << "  pushq %rbp\n"
+       << "  movq %rsp, %rbp\n";
 
-  // --- inicializar listas globales (solo en main) ---
-  if (f->name == "main") {
-    for (auto d : globalVars_) {
-      // solo aquellos globals con inicializador ListExp
-      if (d->init) {
-        if (auto le = dynamic_cast<ListExp*>(d->init)) {
-          // malloc + llenado
-          le->accept(this);    // deja en %rax el puntero al heap
-          // y lo guardamos en la variable global
-          out_ << "  movq %rax, " << d->name << "(%rip)\n";
-        }
-      }
-    }
-    out_ << "\n";
+  // … inicialización de globals …
+
+  // 1) Fase de conteo de locals (y registro de tipos)
+  symtab_.clear();
+  stackSize_ = 0;
+  // Llamamos a un VarDecList “dummy” que solo cuente:
+  for (auto vd : f->body->vardecs->vars) {
+    // modela lo que hace visit(VarDec*) pero solo el ++, sin emitir código
+    stackSize_ += 8;
+    symtab_[vd->name] = -stackSize_;
+    varTypes_[vd->name] = vd->typeName;    // <-- aquí guardamos p → "Point"
   }
 
-  // --- declarar variables locales ---
-  // esto llamará a visit(VarDec*) y acumula stackSize_, symtab_, etc.
-  f->body->vardecs->accept(this);
+  // 2) Reserva de espacio
   if (stackSize_ > 0) {
     out_ << "  subq $" << stackSize_ << ", %rsp\n";
   }
 
-  // --- cuerpo de la función ---
+  // 3) Fase de inicializadores
+  for (auto vd : f->body->vardecs->vars) {
+    if (vd->init) {
+      // evalúa el init en %rax
+      vd->init->accept(this);
+      // almacena en la pila
+      out_ << "  movq %rax, " << symtab_[vd->name] << "(%rbp)\n";
+    }
+  }
+
+  // 4) Cuerpo de sentencias
   f->body->stmts->accept(this);
 
-  // --- epílogo único ---
-  out_ << "  leave\n";
-  out_ << "  ret\n";
+  // 5) Epílogo
+  out_ << "  leave\n"
+       << "  ret\n";
 }
 
 void GenCodeVisitor::visit(FunDecList *list) {
-    // Recorre cada función en el programa
     for (auto fn : list->functions) {
         fn->accept(this);
     }
