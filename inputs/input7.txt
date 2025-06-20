@@ -1,11 +1,10 @@
 class Point(x: Int, y: Int) {
-  var x: Int;
-  var y: Int;
+  var x: Int
+  var y: Int
 }
 
 fun main() {
-  var p: Point = Point(3, 7);
-  print(p.x);
-  print(p.y);
-  return 0;
+  var p: Point = Point(3, 7)
+  print(p.x)
+  print(p.y)
 }

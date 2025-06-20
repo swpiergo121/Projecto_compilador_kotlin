@@ -1,8 +1,7 @@
 fun main() {
-    var sum: Int = 0;
+    var sum: Int = 0
     for (i in 0..9) {
-        sum = sum + i;
+        sum = sum + i
     }
-    println(sum);
-    return 0;
+    println(sum)
 }

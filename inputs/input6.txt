@@ -1,7 +1,6 @@
-var g: Int = 42;
+var g: Int = 42
 
 fun main() {
-    var local: Int = g;
-    println(local);
-    return 0;
+    var local: Int = g
+    println(local)
 }

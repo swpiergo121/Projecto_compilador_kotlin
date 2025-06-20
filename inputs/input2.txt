@@ -1,10 +1,9 @@
 fun main() {
-    var x: Int = 5;
-    val y: Int = 10;
+    var x: Int = 5
+    val y: Int = 10
     if (x > y) {
-        println(x);
+        println(x)
     } else {
-        println(y);
+        println(y)
     }
-    return 0;
 }

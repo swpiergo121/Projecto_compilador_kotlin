@@ -1,6 +1,5 @@
 fun main() {
-    var a: Int = 1;
-    var b: Int = 2;
-    println(a + b);
-    return 0;
+    var a: Int = 1
+    var b: Int = 2
+    println(a + b)
 }
