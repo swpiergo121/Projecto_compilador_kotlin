@@ -36,6 +36,7 @@ ostream& operator<<(ostream &outs, const Token &tok) {
 
         case Token::FUN:outs << "TOKEN(FUN)"; break;
         case Token::VAR:outs << "TOKEN(VAR)"; break;
+        case Token::VAL:outs << "TOKEN(VAL)"; break;
         case Token::IF:outs << "TOKEN(IF)"; break;
         case Token::ELSE:outs << "TOKEN(ELSE)"; break;
         case Token::WHILE:outs << "TOKEN(WHILE)"; break;

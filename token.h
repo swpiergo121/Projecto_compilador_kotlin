@@ -12,7 +12,7 @@ public:
         ID, NUM,
         STRING,
         TRUE, FALSE,
-        FUN, VAR,
+        FUN, VAR, VAL,
         IF, ELSE, WHILE, FOR, RETURN, PRINT,
         PLUS, MINUS, MUL, DIV,
         GT, LT, LE, EQ, GE,        // >, <, <=, ==, >=

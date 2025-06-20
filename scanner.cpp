@@ -59,6 +59,8 @@ Token *Scanner::nextToken() {
       return new Token(Token::FOR, word, 0, (int)word.size());
     if (word == "var")
       return new Token(Token::VAR, word, 0, (int)word.size());
+    if (word == "val")
+      return new Token(Token::VAL, word, 0, (int)word.size());
     if (word == "fun")
       return new Token(Token::FUN, word, 0, (int)word.size());
     if (word == "return")
