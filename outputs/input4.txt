@@ -1,0 +1,39 @@
+.data
+print_fmt: .string "%ld\n"
+
+
+.text
+.globl sum
+.globl main
+
+sum:
+  pushq %rbp
+  movq %rsp, %rbp
+  movq a(%rip), %rax
+  pushq %rax
+  movq b(%rip), %rax
+  popq %rcx
+  addq %rcx, %rax
+  leave
+  ret
+main:
+  pushq %rbp
+  movq %rsp, %rbp
+  subq $16, %rsp
+  movq $3, %rax
+  movq %rax, -8(%rbp)
+  movq $7, %rax
+  movq %rax, -16(%rbp)
+  movq -16(%rbp), %rax
+  pushq %rax
+  movq -8(%rbp), %rax
+  pushq %rax
+  call sum@PLT
+  addq $16, %rsp
+  movq %rax, %rsi
+  leaq print_fmt(%rip), %rdi
+  movl $0, %eax
+  call printf@PLT
+  movq $0, %rax
+  leave
+  ret
