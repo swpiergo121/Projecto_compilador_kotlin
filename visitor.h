@@ -126,7 +126,6 @@ class EVALVisitor : public Visitor {
   Environment env;
   std::unordered_map<std::string, FunDec *> fdecs;
   int retval;
-  bool retflag;
   // Heap interno para literales de lista
   std::unordered_map<int, std::vector<int>> listHeap;
   std::unordered_map<int, std::vector<std::string>> stringListHeap;
@@ -135,6 +134,7 @@ class EVALVisitor : public Visitor {
   // Para asignar IDs únicos a cada instancia
   int nextObjectId = 1;
   // Para saber el orden de los campos de cada clase
+  // class ->
   std::unordered_map<std::string, std::vector<std::string>> classFields_;
   // “Heap” de objetos: objectId -> map(campo -> valor)
   std::unordered_map<int, std::unordered_map<std::string, int>> objectHeap;
@@ -218,14 +218,16 @@ public:
 
 private:
   T &out_;
-  std::unordered_map<std::string, int> symtab_;
   int stackSize_ = 0;
   int labelCount_ = 0;
   bool inGlobal_ = false;
-  std::vector<VarDec *> globalVars_;
   bool collectingStrings_ = false;
+  string nombreFuncion = "";
 
-  std::unordered_map<std::string, std::string> varTypes_;
+  unordered_map<string, int> memoria;
+  unordered_map<string, bool> memoriaGlobal;
+  std::unordered_map<std::string, std::string> memoriaTypes_;
+
   std::unordered_map<std::string, std::unordered_map<std::string, int>>
       structLayouts_;
   std::string newLabel(const std::string &prefix);

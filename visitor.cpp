@@ -228,12 +228,23 @@ void PrintVisitor::visit(ForStatement *s) {
 }
 
 void PrintVisitor::visit(VarDec *d) {
-  cout << (d->isMutable ? "var " : "val ") << d->typeName << " " << d->name;
-  if (d->init) {
-    cout << " = ";
-    d->init->accept(this);
+  cout << (d->isMutable ? "var " : "val ") << d->names[0];
+  for (int i = 1; i < d->names.size(); i++) {
+    cout << ", " << d->names[i];
   }
-  cout << ";" << endl;
+
+  cout << ": " << d->typeName;
+
+  if (d->inits.size() > 0) {
+    cout << " = ";
+    d->inits[0]->accept(this);
+    for (int i = 1; i < d->inits.size(); i++) {
+      cout << ", " << d->names[i];
+      d->inits[i]->accept(this);
+    }
+  }
+
+  cout << endl;
 }
 
 void PrintVisitor::visit(VarDecList *list) {
@@ -309,7 +320,6 @@ void EVALVisitor::ejecutar(Program *p) {
   }
 
   // 4) Ejecuta main
-  retflag = false;
   if (p->classDecs)
     p->classDecs->accept(this);
   if (p->funDecs)
@@ -318,11 +328,6 @@ void EVALVisitor::ejecutar(Program *p) {
 
   // 5) Sal del scope global
   env.remove_level();
-
-  if (!retflag) {
-    cout << "Error: main sin return" << endl;
-    exit(1);
-  }
 }
 
 int EVALVisitor::visit(BinaryExp *exp) {
@@ -429,12 +434,7 @@ int EVALVisitor::visit(FCallExp *exp) {
   }
 
   // 5) Ejecutar cuerpo de la función
-  retflag = false;
   fn->body->accept(this);
-  if (!retflag) {
-    cerr << "Error: función '" << fn->name << "' sin return" << endl;
-    exit(1);
-  }
   int result = retval;
 
   // 6) Salir del scope
@@ -568,7 +568,6 @@ void EVALVisitor::visit(PrintStatement *stm) {
 
 void EVALVisitor::visit(ReturnStatement *stm) {
   retval = stm->expr ? stm->expr->accept(this) : 0;
-  retflag = true;
 }
 
 void EVALVisitor::visit(IfStatement *stm) {
@@ -601,12 +600,15 @@ void EVALVisitor::visit(ForStatement *stm) {
 
 void EVALVisitor::visit(VarDec *dec) {
   // 1) la declaro con valor basura o 0
-  env.add_var(dec->name, dec->typeName);
+  for (int i = 0; i < dec->names.size(); i++) {
+    env.add_var(dec->names[i], dec->typeName);
+  }
 
   // 2) si tenía inicializador, lo evalúo y actualizo
-  if (dec->init) {
-    int v = dec->init->accept(this);
-    env.update(dec->name, v);
+  for (int i = 0; i < dec->inits.size(); i++) {
+    env.add_var(dec->names[i], dec->typeName);
+    int v = dec->inits[i]->accept(this);
+    env.update(dec->names[i], v);
   }
 }
 
@@ -616,12 +618,14 @@ void EVALVisitor::visit(VarDecList *list) {
 }
 
 void EVALVisitor::visit(ClassDec *dec) {
+  // I don't think this is working
+  // TODO
   // Guarda el orden de los campos tal como aparecen
-  std::vector<std::string> fields;
-  for (auto var : dec->members->vars) {
-    fields.push_back(var->name);
-  }
-  classFields_[dec->name] = std::move(fields);
+  // std::vector<std::string> fields;
+  // for (auto var : dec->members->vars) {
+  //   fields.push_back(var);
+  // }
+  // classFields_[dec->name] = std::move(fields);
 }
 
 void EVALVisitor::visit(ClassDecList *list) {
@@ -657,39 +661,6 @@ template <typename T> GenCodeVisitor<T>::GenCodeVisitor(T &out) : out_(out) {}
 
 // Generación principal
 template <typename T> void GenCodeVisitor<T>::generate(Program *prog) {
-  collectingStrings_ = true;
-  for (auto d : prog->vardecs->vars)
-    if (d->init)
-      d->init->accept(this);
-  collectingStrings_ = false;
-
-  // ======== PASADA 2: EMITIR .data ========
-  out_ << ".data\n";
-  out_ << "print_fmt: .string \"%ld\\n\"\n\n";
-
-  globalVars_ = prog->vardecs->vars;
-
-  // 2.a) Literales de cadena
-  for (auto &p : stringLabel_) {
-    out_ << p.second << ": .string \"" << p.first << "\"\n";
-  }
-  if (!stringLabel_.empty())
-    out_ << "\n";
-
-  // 2.b) Variables globales
-  inGlobal_ = true;
-  prog->vardecs->accept(this);
-  inGlobal_ = false;
-
-  prog->classDecs->accept(this);
-
-  out_ << "\n.text\n";
-  // Declaramos cada función:
-  for (auto &fn : prog->funDecs->functions) {
-    out_ << ".globl " << fn->name << "\n";
-  }
-  out_ << "\n";
-
   prog->accept(this);
 }
 
@@ -723,8 +694,8 @@ template <typename T> int GenCodeVisitor<T>::visit(BoolExp *e) {
 }
 
 template <typename T> int GenCodeVisitor<T>::visit(IdentifierExp *e) {
-  if (symtab_.count(e->name)) {
-    int off = symtab_.at(e->name);
+  if (memoria.count(e->name)) {
+    int off = memoria.at(e->name);
     out_ << "  movq " << off << "(%rbp), %rax\n";
   } else {
     // variable global
@@ -737,14 +708,13 @@ template <typename T> int GenCodeVisitor<T>::visit(BinaryExp *e) {
   e->left->accept(this);
   out_ << "  pushq %rax\n";
   e->right->accept(this);
-  out_ << "  popq %rcx\n";
+  out_ << "  movq %rax, %rcx\n  popq %rax\n";
   switch (e->op) {
   case PLUS_OP:
     out_ << "  addq %rcx, %rax\n";
     break;
   case MINUS_OP:
-    out_ << "  subq %rax, %rcx\n"
-            "  movq %rcx, %rax\n";
+    out_ << "  movq %rcx, %rax\n";
     break;
   case MUL_OP:
     out_ << "  imulq %rcx, %rax\n";
@@ -760,8 +730,9 @@ template <typename T> int GenCodeVisitor<T>::visit(BinaryExp *e) {
     break;
   case LE_OP:
     out_ << "  cmpq %rcx, %rax\n"
-            "  setle %al\n"
-            "  movzbq %al, %rax\n";
+         << "  movl $0, %eax\n"
+         << "  setle %al\n"
+         << "  movzbq %al, %rax\n";
     break;
   case EQ_OP:
     out_ << "  cmpq %rcx, %rax\n"
@@ -779,9 +750,9 @@ template <typename T> int GenCodeVisitor<T>::visit(IndexExp *e) {
   e->index->accept(this);
 
   // 2) Cargar la dirección base del array en %rbx
-  if (symtab_.count(e->name)) {
+  if (memoria.count(e->name)) {
     // variable local en la pila
-    int off = symtab_.at(e->name);
+    int off = memoria.at(e->name);
     out_ << "  lea " << off << "(%rbp), %rbx\n"; // &lista
     out_ << "  movq (%rbx), %rbx\n";             // ptr heap
   } else {
@@ -803,14 +774,14 @@ template <typename T> int GenCodeVisitor<T>::visit(IndexExp *e) {
 
 template <typename T> int GenCodeVisitor<T>::visit(DotExp *e) {
   // 1) cargar ptr de la variable (local o global)
-  if (symtab_.count(e->object)) {
-    int off = symtab_.at(e->object);
+  if (memoria.count(e->object)) {
+    int off = memoria.at(e->object);
     out_ << "  movq " << off << "(%rbp), %rax\n";
   } else {
     out_ << "  movq " << e->object << "(%rip), %rax\n";
   }
   // 2) offset del campo
-  auto structType = varTypes_.at(e->object);
+  auto structType = memoriaTypes_.at(e->object);
   int fldOff = structLayouts_.at(structType).at(e->member);
   // 3) cargar campo
   out_ << "  addq $" << fldOff << ", %rax\n"
@@ -903,17 +874,21 @@ template <typename T> int GenCodeVisitor<T>::visit(FCallExp *e) {
     return 0;
   }
 
-  // — resto de llamadas (print, funciones…) —
-  // 1) Evaluar argumentos en pila
-  for (int i = int(e->args.size()) - 1; i >= 0; --i) {
+  // fun call
+  // 1) Evaluar parametros dados
+  vector<std::string> argRegs = {"%rdi", "%rsi", "%rdx", "%rcx", "%r8", "%r9"};
+  for (int i = 0; i < e->args.size(); i++) {
     e->args[i]->accept(this);
-    out_ << "  pushq %rax\n";
+    out_ << " movq %rax," << argRegs[i] << endl;
   }
+
   // 2) Llamada a función externa/usuario
-  out_ << "  call " << e->name << "@PLT\n";
+  out_ << "  call " << e->name << "\n";
+
   // 3) Limpiar pila
   if (!e->args.empty())
     out_ << "  addq $" << (e->args.size() * 8) << ", %rsp\n";
+
   // Resultado en %rax
   return 0;
 }
@@ -927,13 +902,13 @@ template <typename T> void GenCodeVisitor<T>::visit(AssignStatement *s) {
   // ---- paso 2: distinguir LHS ----
   if (auto id = dynamic_cast<IdentifierExp *>(s->target)) {
     // asignación a variable local
-    int off = symtab_.at(id->name);
+    int off = memoria.at(id->name);
     out_ << "  movq %r12, " << off << "(%rbp)\n";
 
   } else if (auto idx = dynamic_cast<IndexExp *>(s->target)) {
     // asignación a array[index]
     // a) cargar la dirección base del array
-    int off = symtab_.at(idx->name);
+    int off = memoria.at(idx->name);
     out_ << "  lea " << off << "(%rbp), %rbx\n"; // &arr
     out_ << "  movq (%rbx), %rbx\n";             // ptr heap
 
@@ -947,9 +922,9 @@ template <typename T> void GenCodeVisitor<T>::visit(AssignStatement *s) {
 
   } else if (auto dot = dynamic_cast<DotExp *>(s->target)) {
     // asignación a struct.field
-    int offObj = symtab_.at(dot->object);
+    int offObj = memoria.at(dot->object);
     out_ << "  lea " << offObj << "(%rbp), %rbx\n"; // &obj
-    auto structType = varTypes_.at(dot->object);
+    auto structType = memoriaTypes_.at(dot->object);
     int fldOff = structLayouts_.at(structType).at(dot->member);
     out_ << "  addq $" << fldOff << ", %rbx\n"; // &obj.member
     out_ << "  movq %r12, (%rbx)\n";
@@ -996,12 +971,12 @@ template <typename T> void GenCodeVisitor<T>::visit(WhileStatement *s) {
 template <typename T> void GenCodeVisitor<T>::visit(ForStatement *s) {
   // 1) Crear espacio para la variable índice
   stackSize_ += 8;
-  symtab_[s->varName] = -stackSize_;
+  memoria[s->varName] = -stackSize_;
   // 2) Distinguir rango numérico o lista
   if (auto loop = dynamic_cast<LoopExp *>(s->iterable)) {
     // 2.1) start, end, step
     loop->start->accept(this); // -> %rax
-    out_ << "  movq %rax, " << symtab_[s->varName] << "(%rbp)\n";
+    out_ << "  movq %rax, " << memoria[s->varName] << "(%rbp)\n";
     loop->end->accept(this); // -> %rax
     out_ << "  movq %rax, %r11\n";
     if (loop->step) {
@@ -1018,7 +993,7 @@ template <typename T> void GenCodeVisitor<T>::visit(ForStatement *s) {
     auto Lend = newLabel("Lfe");
     out_ << Lfor << ":\n";
     // cargar i
-    out_ << "  movq " << symtab_[s->varName] << "(%rbp), %rcx\n";
+    out_ << "  movq " << memoria[s->varName] << "(%rbp), %rcx\n";
     // comparar con end (%r11)
     if (loop->downTo)
       out_ << "  cmpq %r11, %rcx\n  jl " << Lend << "\n";
@@ -1027,18 +1002,18 @@ template <typename T> void GenCodeVisitor<T>::visit(ForStatement *s) {
     // cuerpo
     s->body->accept(this);
     // i += step
-    out_ << "  movq " << symtab_[s->varName] << "(%rbp), %rax\n";
+    out_ << "  movq " << memoria[s->varName] << "(%rbp), %rax\n";
     out_ << "  addq %r10, %rax\n";
-    out_ << "  movq %rax, " << symtab_[s->varName] << "(%rbp)\n";
+    out_ << "  movq %rax, " << memoria[s->varName] << "(%rbp)\n";
     out_ << "  jmp " << Lfor << "\n";
     out_ << Lend << ":\n";
   } else {
     // 1) inicializar índice = 0
-    out_ << "  movq $0, " << symtab_[s->varName] << "(%rbp)\n";
+    out_ << "  movq $0, " << memoria[s->varName] << "(%rbp)\n";
 
     // 2) cargar ptr al primer elemento de la lista
     auto id = static_cast<IdentifierExp *>(s->iterable);
-    int offList = symtab_.at(id->name);
+    int offList = memoria.at(id->name);
     out_ << "  lea " << offList << "(%rbp), %rbx\n" // &varList
          << "  movq (%rbx), %rbx\n";                // ptr al heap
 
@@ -1051,26 +1026,26 @@ template <typename T> void GenCodeVisitor<T>::visit(ForStatement *s) {
     out_ << Lfor << ":\n";
 
     // 5) comparar idx >= n → fin
-    out_ << "  movq " << symtab_[s->varName] << "(%rbp), %rax\n"
+    out_ << "  movq " << memoria[s->varName] << "(%rbp), %rax\n"
          << "  cmpq $" << n << ", %rax\n"
          << "  jge " << Lend << "\n";
 
     // 6) cargar elemento actual
-    out_ << "  movq " << symtab_[s->varName] << "(%rbp), %rax\n"
+    out_ << "  movq " << memoria[s->varName] << "(%rbp), %rax\n"
          << "  salq $3, %rax\n"      // *8
          << "  addq %rax, %rbx\n"    // &elem
          << "  movq (%rbx), %rax\n"; // valor o ptr
 
     // 7) asignarlo a la variable de iteración
-    out_ << "  movq %rax, " << symtab_[s->varName] << "(%rbp)\n";
+    out_ << "  movq %rax, " << memoria[s->varName] << "(%rbp)\n";
 
     // 8) cuerpo del bucle
     s->body->accept(this);
 
     // 9) incrementar índice y saltar al inicio
-    out_ << "  movq " << symtab_[s->varName] << "(%rbp), %rax\n"
+    out_ << "  movq " << memoria[s->varName] << "(%rbp), %rax\n"
          << "  addq $1, %rax\n"
-         << "  movq %rax, " << symtab_[s->varName] << "(%rbp)\n"
+         << "  movq %rax, " << memoria[s->varName] << "(%rbp)\n"
          << "  jmp " << Lfor << "\n"
          << Lend << ":\n";
   }
@@ -1079,34 +1054,13 @@ template <typename T> void GenCodeVisitor<T>::visit(ForStatement *s) {
 // ── Declaraciones y bloques ──
 
 template <typename T> void GenCodeVisitor<T>::visit(VarDec *d) {
-  if (inGlobal_) {
-    // --- globales en .data ---
-    out_ << d->name << ": .quad ";
-    if (auto num = dynamic_cast<NumberExp *>(d->init)) {
-      out_ << num->value;
+  for (int i = 0; i < d->names.size(); i++) {
+    memoriaTypes_[d->names[i]] = d->typeName;
+    if (inGlobal_) {
+      memoriaGlobal[d->names[i]] = true;
     } else {
-      out_ << "0";
-    }
-    out_ << "\n";
-    return;
-  }
-
-  // --- variable LOCAL: reservar espacio ---
-  stackSize_ += 8;
-  symtab_[d->name] = -stackSize_;
-  varTypes_[d->name] = d->typeName;
-
-  // --- si hay inicializador, generar código para ello ---
-  if (d->init) {
-    // 1) evaluamos la expresión de init, queda en %rax
-    d->init->accept(this);
-
-    // 2) almacenamos %rax en el offset correspondiente
-    out_ << "  movq %rax, " << symtab_[d->name] << "(%rbp)\n";
-
-    // 3) si fuera lista, también guardamos su longitud
-    if (auto le = dynamic_cast<ListExp *>(d->init)) {
-      listLength_[d->name] = (int)le->elements.size();
+      stackSize_ += 8;
+      memoria[d->names[i]] = -stackSize_;
     }
   }
 }
@@ -1117,35 +1071,51 @@ template <typename T> void GenCodeVisitor<T>::visit(VarDecList *l) {
 }
 
 template <typename T> void GenCodeVisitor<T>::visit(FunDec *f) {
+  out_ << ".globl " << f->name << "\n";
   out_ << f->name << ":\n"
        << "  pushq %rbp\n"
        << "  movq %rsp, %rbp\n";
 
   // … inicialización de globals …
+  nombreFuncion = f->name;
 
   // 1) Fase de conteo de locals (y registro de tipos)
-  symtab_.clear();
+  memoria.clear();
   stackSize_ = 0;
-  // Llamamos a un VarDecList “dummy” que solo cuente:
-  for (auto vd : f->body->vardecs->vars) {
-    // modela lo que hace visit(VarDec*) pero solo el ++, sin emitir código
+
+  vector<std::string> argRegs = {"%rdi", "%rsi", "%rdx", "%rcx", "%r8", "%r9"};
+
+  // Asignacion de parametros dados a la funcion
+  for (int i = 0; i < f->params.size(); i++) {
     stackSize_ += 8;
-    symtab_[vd->name] = -stackSize_;
-    varTypes_[vd->name] = vd->typeName; // <-- aquí guardamos p → "Point"
+    memoria[f->params[i].name] = -stackSize_;
+    memoriaTypes_[f->params[i].name] = f->params[i].name;
+
+    out_ << " mov " << argRegs[i] << ", " << -stackSize_ << "(%rbp)" << endl;
   }
+
+  f->body->vardecs->accept(this);
 
   // 2) Reserva de espacio
   if (stackSize_ > 0) {
     out_ << "  subq $" << stackSize_ << ", %rsp\n";
   }
-
   // 3) Fase de inicializadores
-  for (auto vd : f->body->vardecs->vars) {
-    if (vd->init) {
-      // evalúa el init en %rax
-      vd->init->accept(this);
-      // almacena en la pila
-      out_ << "  movq %rax, " << symtab_[vd->name] << "(%rbp)\n";
+  // --- si hay inicializador, generar código para ello ---
+  for (auto varDecs : f->body->vardecs->vars) {
+    if (varDecs->inits.size() > 0) {
+      for (int i = 0; i < varDecs->inits.size(); i++) {
+        // 1) evaluamos la expresión de init, queda en %rax
+        varDecs->inits[i]->accept(this);
+
+        // 2) almacenamos %rax en el offset correspondiente
+        out_ << "  movq %rax, " << memoria[varDecs->names[i]] << "(%rbp)\n";
+
+        // 3) si fuera lista, también guardamos su longitud
+        if (auto le = dynamic_cast<ListExp *>(varDecs->inits[i])) {
+          listLength_[varDecs->names[i]] = (int)le->elements.size();
+        }
+      }
     }
   }
 
@@ -1153,6 +1123,7 @@ template <typename T> void GenCodeVisitor<T>::visit(FunDec *f) {
   f->body->stmts->accept(this);
 
   // 5) Epílogo
+  out_ << ".end_" << f->name << ":" << endl;
   out_ << "  leave\n"
        << "  ret\n";
 }
@@ -1164,11 +1135,13 @@ template <typename T> void GenCodeVisitor<T>::visit(FunDecList *list) {
 }
 
 template <typename T> void GenCodeVisitor<T>::visit(ClassDec *dec) {
-  int offset = 0;
-  for (auto field : dec->members->vars) {
-    structLayouts_[dec->name][field->name] = offset;
-    offset += 8; // asumimos 8 bytes por campo
-  }
+  // I think I broke this. Maybe
+  // TODO
+  // int offset = 0;
+  // for (auto field : dec->members->vars) {
+  //   structLayouts_[dec->name][field->name] = offset;
+  //   offset += 8; // asumimos 8 bytes por campo
+  // }
 }
 
 template <typename T> void GenCodeVisitor<T>::visit(ClassDecList *list) {
@@ -1187,13 +1160,49 @@ template <typename T> void GenCodeVisitor<T>::visit(Body *b) {
   b->stmts->accept(this);
 }
 
-template <typename T> void GenCodeVisitor<T>::visit(Program *p) {
-  p->funDecs->accept(this);
+template <typename T> void GenCodeVisitor<T>::visit(Program *prog) {
+  collectingStrings_ = true;
+  for (auto d : prog->vardecs->vars) {
+    for (int i = 0; i < d->inits.size(); i++) {
+      d->inits[i]->accept(this);
+    }
+  }
+  collectingStrings_ = false;
+
+  // ======== PASADA 2: EMITIR .data ========
+  out_ << ".data\n";
+  out_ << "print_fmt: .string \"%ld\\n\"\n\n";
+
+  // 2.a) Literales de cadena
+  for (auto &p : stringLabel_) {
+    out_ << p.second << ": .string \"" << p.first << "\"\n";
+  }
+  if (!stringLabel_.empty())
+    out_ << "\n";
+
+  // 2.b) Variables globales
+  inGlobal_ = true;
+  prog->vardecs->accept(this);
+  inGlobal_ = false;
+
+  for (auto &[var, _] : memoriaGlobal) {
+    out_ << var << ": .quad 0" << endl;
+  }
+
+  prog->classDecs->accept(this);
+
+  out_ << "\n.text\n\n";
+
+  prog->funDecs->accept(this);
+
+  out_ << ".section .note.GNU-stack,\"\",@progbits" << endl;
 }
 
 template <typename T> void GenCodeVisitor<T>::visit(ReturnStatement *s) {
-  if (s->expr)
+  if (s->expr) {
     s->expr->accept(this);
+    out_ << " jmp .end_" << nombreFuncion << endl;
+  }
 }
 
 // Instation to prevent linking issues

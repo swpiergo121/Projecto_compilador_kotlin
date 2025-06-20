@@ -8,6 +8,20 @@
 
 using namespace std;
 
+string get_before_dot(string input) {
+  // Find the position of the first occurrence of '.'
+  size_t dot_position = input.find('.');
+
+  // If a dot is found, return the substring from the beginning up to the dot's
+  // position
+  if (dot_position != string::npos) {
+    return input.substr(0, dot_position);
+  } else {
+    // If no dot is found, return the original string
+    return input;
+  }
+}
+
 int main() {
 
   string preffix_input = "inputs/";
@@ -55,7 +69,7 @@ int main() {
       // cout << "Ejecución exitosa" << endl;
       // cout << endl;
       cout << "Generando código assembly:" << endl;
-      ofstream outfile(preffix_out + path);
+      ofstream outfile(preffix_out + get_before_dot(path) + ".s");
       GenCodeVisitor<ofstream> genVisitor(outfile);
       genVisitor.generate(program);
       cout << endl;
