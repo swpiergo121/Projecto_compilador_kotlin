@@ -43,6 +43,12 @@
         "string_view": "cpp",
         "typeinfo": "cpp",
         "unordered_map": "cpp",
-        "variant": "cpp"
+        "variant": "cpp",
+        "cstddef": "cpp",
+        "fstream": "cpp",
+        "__tree": "cpp",
+        "iomanip": "cpp",
+        "map": "cpp",
+        "algorithm": "cpp"
     }
 }

@@ -618,20 +618,23 @@ void EVALVisitor::visit(VarDecList *list) {
 }
 
 void EVALVisitor::visit(ClassDec *dec) {
-  // I don't think this is working
-  // TODO
-  // Guarda el orden de los campos tal como aparecen
-  // std::vector<std::string> fields;
-  // for (auto var : dec->members->vars) {
-  //   fields.push_back(var);
-  // }
-  // classFields_[dec->name] = std::move(fields);
+  std::vector<std::string> fields;
+  for (auto var : dec->members->vars) {
+    for (auto &name : var->names)
+      fields.push_back(name);
+  }
+  classFields_[dec->name] = std::move(fields);
 }
 
-void EVALVisitor::visit(ClassDecList *list) {
-  for (auto c : list->classes)
-    c->accept(this);
+void EVALVisitor::visit(ClassDecList *cdl) {
+  for (auto c : cdl->classes) {
+    classFields_[c->name] = vector<string>();
+    for (auto arg : c->args) 
+      classFields_[c->name].push_back(arg.name);
+    c->members->accept(this);
+  }
 }
+
 
 void EVALVisitor::visit(FunDec *fn) { fdecs[fn->name] = fn; }
 
@@ -1134,14 +1137,16 @@ template <typename T> void GenCodeVisitor<T>::visit(FunDecList *list) {
   }
 }
 
-template <typename T> void GenCodeVisitor<T>::visit(ClassDec *dec) {
-  // I think I broke this. Maybe
-  // TODO
-  // int offset = 0;
-  // for (auto field : dec->members->vars) {
-  //   structLayouts_[dec->name][field->name] = offset;
-  //   offset += 8; // asumimos 8 bytes por campo
-  // }
+template <typename T>
+void GenCodeVisitor<T>::visit(ClassDec *dec) {
+  // offset en bytes de cada campo (8 bytes por campo)
+  int offset = 0;
+  for (auto var : dec->members->vars) {
+    for (const auto &name : var->names) {
+      structLayouts_[dec->name][name] = offset;
+      offset += 8;
+    }
+  }
 }
 
 template <typename T> void GenCodeVisitor<T>::visit(ClassDecList *list) {

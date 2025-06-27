@@ -151,8 +151,7 @@ VarDec *Parser::parseVarDec() {
 ClassDecList *Parser::parseClassDecList() {
   auto list = new ClassDecList();
   // Mientras veamos la palabra “class”
-  while (check(Token::ID) && current->text == "class") {
-    advance(); // consumimos “class”
+  while (match(Token::ID, "class")) {
     list->add(parseClassDec());
   }
   return list;
@@ -267,17 +266,32 @@ StatementList *Parser::parseStmtList() {
 }
 
 Stm *Parser::parseStmt() {
-  if (match(Token::ID)) {
-    // Modify to change values of lsit and dot expressions
-    // TODO
-    auto id = previous->text;
-    if (match(Token::ASSIGN)) {
-      Exp *e = parseCExp();
-      return new AssignStatement(new IdentifierExp(id), e);
-    } else {
-      error("Después del identificador se esperaba '=' para asignación");
-    }
-  } else if (match(Token::PRINT) || match(Token::ID, "println")) {
+    if (check(Token::ID)) {
+      auto id = advance()->text;
+
+      // 1) index assignment: foo[expr] = ...
+      if (match(Token::LBRACK)) {
+        Exp* idx = parseCExp();
+        consume(Token::RBRACK, "Se esperaba ']' en índice de asignación");
+        consume(Token::ASSIGN, "Se esperaba '=' en asignación de índice");
+        Exp* e = parseCExp();
+        return new AssignStatement(new IndexExp(id, idx), e);
+      }
+      // 2) field assignment: foo.bar = ...
+      else if (match(Token::DOT)) {
+        auto member = consume(Token::ID, "Se esperaba miembro tras '.'")->text;
+        consume(Token::ASSIGN, "Se esperaba '=' en asignación de campo");
+        Exp* e = parseCExp();
+        return new AssignStatement(new DotExp(id, member), e);
+      }
+      // 3) simple var assignment: foo = ...
+      else if (match(Token::ASSIGN)) {
+        Exp* e = parseCExp();
+        return new AssignStatement(new IdentifierExp(id), e);
+      } else {
+        error("Después del identificador se esperaba '=' o un acceso [. or []]");
+      }
+    } else if (match(Token::PRINT) || match(Token::ID, "println")) {
     consume(Token::PI, "Se esperaba '(' tras print");
     Exp *e = parseCExp();
     consume(Token::PD, "Se esperaba ')' en print");
