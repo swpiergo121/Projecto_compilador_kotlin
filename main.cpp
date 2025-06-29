@@ -1,11 +1,12 @@
 #include "parser.h"
 #include "scanner.h"
 #include "visitor.h"
+#include <algorithm>
+#include <dirent.h>
 #include <fstream>
 #include <iostream>
 #include <string>
 #include <vector>
-#include <dirent.h>
 
 using namespace std;
 

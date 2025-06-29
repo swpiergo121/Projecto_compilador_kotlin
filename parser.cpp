@@ -3,6 +3,7 @@
 #include "exp.h"
 #include "token.h"
 #include <iostream>
+#include <functional>
 #include <stdexcept>
 
 using namespace std;

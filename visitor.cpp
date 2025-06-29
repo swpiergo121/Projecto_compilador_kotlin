@@ -2,7 +2,9 @@
 #include "visitor.h"
 #include "exp.h"
 #include <fstream>
+#include <functional>
 #include <iostream>
+#include <sstream>
 
 using namespace std;
 
@@ -1391,3 +1393,4 @@ template <typename T> void GenCodeVisitor<T>::visit(ReturnStatement *s) {
 // Instation to prevent linking issues
 template class GenCodeVisitor<std::ostream>;
 template class GenCodeVisitor<std::ofstream>;
+template class GenCodeVisitor<std::stringstream>;
