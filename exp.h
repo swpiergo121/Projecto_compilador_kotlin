@@ -106,9 +106,9 @@ public:
 
 class DotExp : public Exp {
 public:
-  std::string object;
+  Exp*    object;
   std::string member;
-  DotExp(const std::string &object, const std::string &member);
+  DotExp(Exp* object, const std::string &member);
   int accept(Visitor *v) override;
   ~DotExp();
 };

@@ -122,8 +122,8 @@ void ListExp::add(Exp *elem) { elements.push_back(elem); }
 IndexExp::IndexExp(const string &name, Exp *index) : name(name), index(index) {}
 
 // DotExp
-DotExp::DotExp(const string &object, const string &member)
-    : object(object), member(member) {}
+DotExp::DotExp(Exp* object, const std::string &member)
+  : object(object), member(member) {}
 
 // LoopExp
 LoopExp::LoopExp(Exp *start, Exp *end, Exp *step, bool downTo)
@@ -175,7 +175,9 @@ ListExp::~ListExp() {
     delete e;
 }
 IndexExp::~IndexExp() { delete index; }
-DotExp::~DotExp() {}
+DotExp::~DotExp() {
+  delete object;
+}
 LoopExp::~LoopExp() {
   delete start;
   delete end;

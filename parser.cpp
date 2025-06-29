@@ -333,6 +333,8 @@ Stm* Parser::parseStmt() {
     }
     // -- 2) asignaciones (índice, campo o simple)
     if (check(Token::ID)) {
+        Token* saveCurrent  = current;
+        Token* savePrevious = previous;
         string name = advance()->text;
 
         // 2.a) foo[expr] = rhs
@@ -348,7 +350,8 @@ Stm* Parser::parseStmt() {
             string member = consume(Token::ID, "Se esperaba miembro tras '.'")->text;
             consume(Token::ASSIGN, "Se esperaba '=' en asignación de campo");
             Exp* rhs = parseCExp();
-            return new AssignStatement(new DotExp(name, member), rhs);
+            Exp* obj = new IdentifierExp(name);
+            return new AssignStatement(new DotExp(obj, member), rhs);
         }
         // 2.c) foo = rhs
         else if (match(Token::ASSIGN)) {
@@ -358,6 +361,9 @@ Stm* Parser::parseStmt() {
         else {
             error("Después del identificador se esperaba '=' para asignación");
         }
+
+        current  = saveCurrent;
+        previous = savePrevious;
     }
     // -- 3) return
     if (match(Token::RETURN)) {
@@ -629,27 +635,37 @@ Exp *Parser::parseFactor() {
 
   // 5) Identificador / llamada / index / member
   else if (match(Token::ID)) {
-    auto name = previous->text;
+    // 1) Partimos de un IdentifierExp
+    Exp* expr = new IdentifierExp(previous->text);
+
+    // 2) Parsing de llamada: foo(...)
     if (match(Token::PI)) {
-      auto call = new FCallExp(name);
+      auto *call = new FCallExp(static_cast<IdentifierExp*>(expr)->name);
       if (!check(Token::PD)) {
-        do {
-          call->add(parseCExp());
-        } while (match(Token::COMA));
+        do { call->add(parseCExp()); } while (match(Token::COMA));
       }
       consume(Token::PD, "Se esperaba ')' en llamada");
-      return call;
+      expr = call;
     }
-    if (match(Token::LBRACK)) {
-      auto idx = parseCExp();
-      consume(Token::RBRACK, "Se esperaba ']' en index");
-      return new IndexExp(name, idx);
+
+    // 3) Ahora encadenamos: [idx] o .member *tantas* veces como aparezcan
+    bool loop = true;
+    while (loop) {
+      if (match(Token::LBRACK)) {
+        Exp* idx = parseCExp();
+        consume(Token::RBRACK, "Se esperaba ']' en index");
+        expr = new IndexExp(static_cast<IdentifierExp*>(expr)->name, idx);
+      }
+      else if (match(Token::DOT)) {
+        auto member = consume(Token::ID, "Se esperaba miembro tras '.'")->text;
+        expr = new DotExp(expr, member);
+      }
+      else {
+        loop = false;
+      }
     }
-    if (match(Token::DOT)) {
-      auto member = consume(Token::ID, "Se esperaba miembro tras '.'")->text;
-      return new DotExp(name, member);
-    }
-    return new IdentifierExp(name);
+
+    return expr;
   }
 
   // 6) Inline if

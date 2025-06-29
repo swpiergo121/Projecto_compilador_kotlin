@@ -522,16 +522,19 @@ int EVALVisitor::visit(IndexExp *exp) {
 }
 
 int EVALVisitor::visit(DotExp *exp) {
-  // 1) obtenemos el objectId (se guardó como variable entera)
-  int objId = env.lookup(exp->object);
-  // 2) buscamos el campo
-  auto &fields = objectHeap[objId];
-  if (!fields.count(exp->member)) {
-    std::cerr << "Error: campo '" << exp->member << "' no existe en "
-              << exp->object << "\n";
+  // 1) Evaluar la sub-expresión que produce el objectId
+  int objId = exp->object->accept(this);
+
+  // 2) Buscar el campo en objectHeap[objId]
+  auto &objMap = objectHeap[objId];
+  auto it = objMap.find(exp->member);
+  if (it == objMap.end()) {
+    std::cerr << "Error: campo '" << exp->member
+              << "' no existe en el objeto\n";
     std::exit(1);
   }
-  return fields[exp->member];
+  retval = it->second;
+  return it->second;
 }
 
 int EVALVisitor::visit(IFExp *exp) {
@@ -576,13 +579,11 @@ void EVALVisitor::visit(AssignStatement *stm) {
 
   // 4) Asignación a struct.field
   if (auto dot = dynamic_cast<DotExp*>(stm->target)) {
-    // obtener objectId almacenado en la variable
-    int objId = env.lookup(dot->object);
-    // actualizar el campo en el heap de objetos
+    // dot->object es un Exp* que al evaluarse da el objectId
+    int objId = dot->object->accept(this);
     objectHeap[objId][dot->member] = val;
     return;
   }
-
   // 5) Cualquier otro LHS no es válido
   std::cerr << "Asignación inválida en LHS no identificador\n";
 }
@@ -844,20 +845,28 @@ template <typename T> int GenCodeVisitor<T>::visit(IndexExp *e) {
   return 0;
 }
 
-template <typename T> int GenCodeVisitor<T>::visit(DotExp *e) {
-  // 1) cargar ptr de la variable (local o global)
-  if (memoria.count(e->object)) {
-    int off = memoria.at(e->object);
-    out_ << "  movq " << off << "(%rbp), %rax\n";
+template <typename T> int GenCodeVisitor<T>::visit(DotExp *exp) {
+  // 1) generar código para evaluar la expresión objeto -> %rax
+  exp->object->accept(this);
+  out_ << "  movq %rax, %rbx\n";
+
+  // 2) extraer nombre de la variable (solo soportamos IdentifierExp aquí)
+  std::string objName;
+  if (auto id = dynamic_cast<IdentifierExp*>(exp->object)) {
+    objName = id->name;
   } else {
-    out_ << "  movq " << e->object << "(%rip), %rax\n";
+    throw std::runtime_error("Nested DotExp not supported in codegen");
   }
-  // 2) offset del campo
-  auto structType = memoriaTypes_.at(e->object);
-  int fldOff = structLayouts_.at(structType).at(e->member);
-  // 3) cargar campo
-  out_ << "  addq $" << fldOff << ", %rax\n"
-       << "  movq (%rax), %rax\n";
+
+  // 3) obtener offset de campo y sumarlo
+  auto structType = memoriaTypes_.at(objName);
+  int fldOff = structLayouts_.at(structType).at(exp->member);
+  if (fldOff != 0) {
+    out_ << "  addq $" << fldOff << ", %rbx\n";
+  }
+
+  // 4) cargar el valor del campo
+  out_ << "  movq (%rbx), %rax\n";
   return 0;
 }
 
@@ -967,50 +976,57 @@ template <typename T> int GenCodeVisitor<T>::visit(FCallExp *e) {
 
 // ── Sentencias ──
 template <typename T> void GenCodeVisitor<T>::visit(AssignStatement *s) {
-  // ---- 1) generar RHS en %rax y salvar en %r12 ----
-  s->expr->accept(this);           // deja valor en %rax
-  out_ << "  movq %rax, %r12\n";   // lo guardamos
+  // 1) evaluar RHS -> %rax, salvar en %r12
+  s->expr->accept(this);
+  out_ << "  movq %rax, %r12\n";
 
-  // ---- 2) LHS: variable local -------------------
+  // 2) caso var local
   if (auto id = dynamic_cast<IdentifierExp*>(s->target)) {
     int off = memoria.at(id->name);
     out_ << "  movq %r12, " << off << "(%rbp)\n";
     return;
   }
 
-  // ---- 3) LHS: array[index] --------------------
+  // 3) caso array[index]
   if (auto idx = dynamic_cast<IndexExp*>(s->target)) {
-    // a) base pointer del array
     int off = memoria.at(idx->name);
     out_ << "  lea " << off << "(%rbp), %rbx\n"
          << "  movq (%rbx), %rbx\n";
-    // b) calcular offset = index*8
-    idx->index->accept(this);      // índice -> %rax
+    idx->index->accept(this);
     out_ << "  salq $3, %rax\n"
-         << "  addq %rax, %rbx\n";
-    // c) store
+         << "  addq %rax, %rbx\n"
+         << "  movq %r12, (%rbx)\n";
+    return;
+  }
+
+  // 4) caso struct.field
+  if (auto dot = dynamic_cast<DotExp*>(s->target)) {
+    // evaluar objeto para dejar puntero en %rax
+    dot->object->accept(this);
+    out_ << "  movq %rax, %rbx\n";
+
+    // extraer nombre de la variable
+    std::string objName;
+    if (auto id = dynamic_cast<IdentifierExp*>(dot->object)) {
+      objName = id->name;
+    } else {
+      throw std::runtime_error("Nested DotExp not supported in codegen");
+    }
+
+    // offset del campo
+    auto structType = memoriaTypes_.at(objName);
+    int fldOff = structLayouts_.at(structType).at(dot->member);
+    if (fldOff != 0) {
+      out_ << "  addq $" << fldOff << ", %rbx\n";
+    }
+
+    // escribir el valor
     out_ << "  movq %r12, (%rbx)\n";
     return;
   }
 
-  // ---- 4) LHS: struct.field --------------------
-  if (auto dot = dynamic_cast<DotExp*>(s->target)) {
-    // a) cargar puntero al objeto en %rbx
-    if (memoriaGlobal.count(dot->object)) {
-      out_ << "  movq " << dot->object << "(%rip), %rbx\n";
-    } else {
-      int off = memoria.at(dot->object);
-      out_ << "  lea " << off << "(%rbp), %rbx\n"
-           << "  movq (%rbx), %rbx\n";
-    }
-    // b) sumar offset del campo
-    auto structType = memoriaTypes_.at(dot->object);
-    int fldOff = structLayouts_.at(structType).at(dot->member);
-    out_ << "  addq $" << fldOff << ", %rbx\n";
-    // c) store RHS desde %r12
-    out_ << "  movq %r12, (%rbx)\n";
-    return;
-  }
+  // 5) caso no soportado
+  throw std::runtime_error("Asignación no soportada en codegen");
 }
 
 template <typename T> void GenCodeVisitor<T>::visit(PrintStatement *s) {
@@ -1048,7 +1064,12 @@ template <typename T> void GenCodeVisitor<T>::visit(WhileStatement *s) {
 }
 
 template <typename T> void GenCodeVisitor<T>::visit(ForStatement *s) {
-  // 1) Crear espacio para la variable índice
+  // 1) Crear espacio para el índice
+  stackSize_ += 8;
+  int idxOff = -stackSize_;
+  memoriaIndex_["__idx" + s->varName] = idxOff;
+
+  // 2) Crear espacio para la variable de iteración
   stackSize_ += 8;
   memoria[s->varName] = -stackSize_;
   // 2) Distinguir rango numérico o lista
@@ -1088,45 +1109,52 @@ template <typename T> void GenCodeVisitor<T>::visit(ForStatement *s) {
     out_ << Lend << ":\n";
   } else {
     // 1) inicializar índice = 0
-    out_ << "  movq $0, " << memoria[s->varName] << "(%rbp)\n";
+    out_ << "  movq $0, " << idxOff << "(%rbp)\n";
 
-    // 2) cargar ptr al primer elemento de la lista
-    auto id = static_cast<IdentifierExp *>(s->iterable);
-    int offList = memoria.at(id->name);
-    out_ << "  lea " << offList << "(%rbp), %rbx\n" // &varList
-         << "  movq (%rbx), %rbx\n";                // ptr al heap
+    // 2) cargar sólo UNA VEZ la dirección base del array en %r14
+    auto id = static_cast<IdentifierExp*>(s->iterable);
+    if (memoria.count(id->name)) {
+      // array/lista local en pila
+      int offList = memoria.at(id->name);
+      out_ << "  lea " << offList << "(%rbp), %rax\n"   // &local
+           << "  movq (%rax), %r14\n";                 // ptr heap -> r14
+    } else {
+      // array global en .data
+      out_ << "  movq " << id->name << "(%rip), %r14\n";
+    }
 
-    // 3) longitud de la lista
+    // 3) longitud
     int n = listLength_.at(id->name);
 
     // 4) etiquetas
     std::string Lfor = newLabel("Lfor");
     std::string Lend = newLabel("Lend");
-    out_ << Lfor << ":\n";
 
-    // 5) comparar idx >= n → fin
-    out_ << "  movq " << memoria[s->varName] << "(%rbp), %rax\n"
-         << "  cmpq $" << n << ", %rax\n"
-         << "  jge " << Lend << "\n";
+    // 5) inicio del loop
+    out_ << Lfor << ":\n"
+    // cargar índice
+        << "  movq " << idxOff << "(%rbp), %rax\n"
+        << "  cmpq $" << n << ", %rax\n"
+        << "  jge " << Lend << "\n"
 
-    // 6) cargar elemento actual
-    out_ << "  movq " << memoria[s->varName] << "(%rbp), %rax\n"
-         << "  salq $3, %rax\n"      // *8
-         << "  addq %rax, %rbx\n"    // &elem
-         << "  movq (%rbx), %rax\n"; // valor o ptr
+    // calcular dirección en %rdx
+        << "  movq " << idxOff << "(%rbp), %rdx\n"
+        << "  salq $3, %rdx\n"
+        << "  addq %r14, %rdx\n"
 
-    // 7) asignarlo a la variable de iteración
-    out_ << "  movq %rax, " << memoria[s->varName] << "(%rbp)\n";
+    // cargar elemento y guardarlo en varName
+        << "  movq (%rdx), %rax\n"
+        << "  movq %rax, " << memoria[s->varName] << "(%rbp)\n";
 
-    // 8) cuerpo del bucle
+    // 8) cuerpo
     s->body->accept(this);
 
-    // 9) incrementar índice y saltar al inicio
-    out_ << "  movq " << memoria[s->varName] << "(%rbp), %rax\n"
-         << "  addq $1, %rax\n"
-         << "  movq %rax, " << memoria[s->varName] << "(%rbp)\n"
-         << "  jmp " << Lfor << "\n"
-         << Lend << ":\n";
+    // 9) incrementar índice y saltar
+    out_ << "  movq " << idxOff << "(%rbp), %rax\n"
+        << "  addq $1, %rax\n"
+        << "  movq %rax, " << idxOff << "(%rbp)\n"
+        << "  jmp " << Lfor << "\n"
+        << Lend << ":\n";
   }
 }
 

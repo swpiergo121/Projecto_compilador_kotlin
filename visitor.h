@@ -227,6 +227,7 @@ private:
   string nombreFuncion = "";
 
   unordered_map<string, int> memoria;
+  std::unordered_map<std::string,int> memoriaIndex_; // para los índices de los for
   unordered_map<string, bool> memoriaGlobal;
   std::unordered_map<std::string, std::string> memoriaTypes_;
 
