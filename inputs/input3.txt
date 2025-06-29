@@ -1,7 +1,0 @@
-fun main() {
-    var sum: Int = 0
-    for (i in 0..9) {
-        sum = sum + i
-    }
-    println(sum)
-}

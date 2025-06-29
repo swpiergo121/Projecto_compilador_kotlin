@@ -1,0 +1,4 @@
+val a = arrayOf(10,20,30)
+fun main() {
+    println(a[1])
+}

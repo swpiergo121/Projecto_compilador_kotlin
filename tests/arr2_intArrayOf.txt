@@ -1,0 +1,5 @@
+val ia = intArrayOf(5,7,9)
+fun main() {
+    println(ia[0])
+    println(ia[2])
+}

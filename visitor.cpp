@@ -306,6 +306,24 @@ void PrintVisitor::visit(Program *p) {
 //----------------------------------------------------------------------
 
 void EVALVisitor::ejecutar(Program *p) {
+  // ── 0) Registrar todas las clases (campos e inits) ──
+  if (p->classDecs) {
+    for (auto *cd : p->classDecs->classes) {
+      // 0.a) Campos (ya lo hace tu visit(ClassDec*), pero podemos rellenarlo aquí con seguridad)
+      std::vector<std::string> flds;
+      for (auto *vd : cd->members->vars)
+        for (auto &nm : vd->names)
+          flds.push_back(nm);
+      classFields_[cd->name] = std::move(flds);
+
+      // 0.b) Inits por defecto
+      std::vector<Exp*> inits;
+      for (auto *vd : cd->members->vars)
+        for (auto *e : vd->inits)
+          inits.push_back(e);
+      classFieldInits_[cd->name] = std::move(inits);
+    }
+  }
   // 1) Nuevo scope (global)
   env.add_level();
 
@@ -319,11 +337,6 @@ void EVALVisitor::ejecutar(Program *p) {
     p->funDecs->accept(this);
   }
 
-  // 4) Ejecuta main
-  if (p->classDecs)
-    p->classDecs->accept(this);
-  if (p->funDecs)
-    p->funDecs->accept(this);
   p->body->accept(this);
 
   // 5) Sal del scope global
@@ -370,18 +383,21 @@ int EVALVisitor::visit(IdentifierExp *exp) {
 }
 
 int EVALVisitor::visit(FCallExp *exp) {
-  // 0) Constructor de struct/clase
   auto itFields = classFields_.find(exp->name);
   if (itFields != classFields_.end()) {
-    // 1) Nuevo objectId
     int objId = nextObjectId++;
-    // 2) Evaluar cada argumento y asignarlo al campo correspondiente
     auto &fields = itFields->second;
-    for (size_t i = 0; i < exp->args.size(); ++i) {
-      int val = exp->args[i]->accept(this);
+    auto &inits  = classFieldInits_[exp->name];
+
+    for (size_t i = 0; i < fields.size(); ++i) {
+      int val;
+      if (i < exp->args.size())
+        val = exp->args[i]->accept(this);
+      else
+        val = inits[i]->accept(this);
       objectHeap[objId][fields[i]] = val;
     }
-    // 3) Guardar el objId en el entorno local (por ejemplo, como Int)
+    retval = objId;
     return objId;
   }
 
@@ -535,19 +551,40 @@ int EVALVisitor::visit(LoopExp *exp) {
 }
 
 void EVALVisitor::visit(AssignStatement *stm) {
+  // 1) Evaluar RHS
   int val = stm->expr->accept(this);
-  if (auto id = dynamic_cast<IdentifierExp *>(stm->target)) {
-    const std::string &name = id->name;
 
+  // 2) Asignación a variable simple
+  if (auto id = dynamic_cast<IdentifierExp*>(stm->target)) {
+    const std::string &name = id->name;
     if (!env.check(name)) {
-      cout << "Variable no declarada: " << name << endl;
+      std::cerr << "Variable no declarada: " << name << "\n";
       return;
     }
-
     env.update(name, val);
-  } else {
-    std::cerr << "Asignación inválida en LHS no identificador\n";
+    return;
   }
+
+  // 3) Asignación a array[index]
+  if (auto idx = dynamic_cast<IndexExp*>(stm->target)) {
+    // asumimos que la variable es un array de enteros en listHeap[id]
+    int arrId = env.lookup(idx->name);
+    int i     = idx->index->accept(this);
+    listHeap[arrId][i] = val;
+    return;
+  }
+
+  // 4) Asignación a struct.field
+  if (auto dot = dynamic_cast<DotExp*>(stm->target)) {
+    // obtener objectId almacenado en la variable
+    int objId = env.lookup(dot->object);
+    // actualizar el campo en el heap de objetos
+    objectHeap[objId][dot->member] = val;
+    return;
+  }
+
+  // 5) Cualquier otro LHS no es válido
+  std::cerr << "Asignación inválida en LHS no identificador\n";
 }
 
 void EVALVisitor::visit(PrintStatement *stm) {
@@ -930,42 +967,49 @@ template <typename T> int GenCodeVisitor<T>::visit(FCallExp *e) {
 
 // ── Sentencias ──
 template <typename T> void GenCodeVisitor<T>::visit(AssignStatement *s) {
-  // ---- paso 1: evaluar la expresión RHS y salvarla en %r12 ----
-  s->expr->accept(this);         // deja el valor en %rax
-  out_ << "  movq %rax, %r12\n"; // salvar RHS
+  // ---- 1) generar RHS en %rax y salvar en %r12 ----
+  s->expr->accept(this);           // deja valor en %rax
+  out_ << "  movq %rax, %r12\n";   // lo guardamos
 
-  // ---- paso 2: distinguir LHS ----
-  if (auto id = dynamic_cast<IdentifierExp *>(s->target)) {
-    // asignación a variable local
+  // ---- 2) LHS: variable local -------------------
+  if (auto id = dynamic_cast<IdentifierExp*>(s->target)) {
     int off = memoria.at(id->name);
     out_ << "  movq %r12, " << off << "(%rbp)\n";
+    return;
+  }
 
-  } else if (auto idx = dynamic_cast<IndexExp *>(s->target)) {
-    // asignación a array[index]
-    // a) cargar la dirección base del array
+  // ---- 3) LHS: array[index] --------------------
+  if (auto idx = dynamic_cast<IndexExp*>(s->target)) {
+    // a) base pointer del array
     int off = memoria.at(idx->name);
-    out_ << "  lea " << off << "(%rbp), %rbx\n"; // &arr
-    out_ << "  movq (%rbx), %rbx\n";             // ptr heap
-
-    // b) calcular offset = index * 8
+    out_ << "  lea " << off << "(%rbp), %rbx\n"
+         << "  movq (%rbx), %rbx\n";
+    // b) calcular offset = index*8
     idx->index->accept(this);      // índice -> %rax
-    out_ << "  salq $3, %rax\n";   // *8
-    out_ << "  addq %rax, %rbx\n"; // &elemento
-
-    // c) escribir el valor salvado en %r12
+    out_ << "  salq $3, %rax\n"
+         << "  addq %rax, %rbx\n";
+    // c) store
     out_ << "  movq %r12, (%rbx)\n";
+    return;
+  }
 
-  } else if (auto dot = dynamic_cast<DotExp *>(s->target)) {
-    // asignación a struct.field
-    int offObj = memoria.at(dot->object);
-    out_ << "  lea " << offObj << "(%rbp), %rbx\n"; // &obj
+  // ---- 4) LHS: struct.field --------------------
+  if (auto dot = dynamic_cast<DotExp*>(s->target)) {
+    // a) cargar puntero al objeto en %rbx
+    if (memoriaGlobal.count(dot->object)) {
+      out_ << "  movq " << dot->object << "(%rip), %rbx\n";
+    } else {
+      int off = memoria.at(dot->object);
+      out_ << "  lea " << off << "(%rbp), %rbx\n"
+           << "  movq (%rbx), %rbx\n";
+    }
+    // b) sumar offset del campo
     auto structType = memoriaTypes_.at(dot->object);
     int fldOff = structLayouts_.at(structType).at(dot->member);
-    out_ << "  addq $" << fldOff << ", %rbx\n"; // &obj.member
+    out_ << "  addq $" << fldOff << ", %rbx\n";
+    // c) store RHS desde %r12
     out_ << "  movq %r12, (%rbx)\n";
-
-  } else {
-    // otros casos (p.ej. listas, etc.)
+    return;
   }
 }
 
@@ -1091,8 +1135,15 @@ template <typename T> void GenCodeVisitor<T>::visit(ForStatement *s) {
 template<typename T> void GenCodeVisitor<T>::visit(VarDec *d) {
   for (size_t i = 0; i < d->names.size(); ++i) {
     const auto &name = d->names[i];
-    // 1) Guardar el tipo (p.ej. "Int", "String", ...)
-    memoriaTypes_[name] = d->typeName;
+    // 1) Guardar el tipo: si hay anotación explícita, la usamos;
+    //    si no y viene de un constructor (FCallExp), inferimos el tipo.
+    if (!d->typeName.empty()) {
+      memoriaTypes_[name] = d->typeName;
+    } else if (i < d->inits.size()) {
+      if (auto *fc = dynamic_cast<FCallExp*>(d->inits[i])) {
+        memoriaTypes_[name] = fc->name;  // inferimos "P" de P()
+      }
+    }
 
     if (inGlobal_) {
       // 2) Marcar la variable como global

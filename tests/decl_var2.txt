@@ -1,0 +1,4 @@
+var b: Long = 1234567890123
+fun main() {
+    println(b)
+}

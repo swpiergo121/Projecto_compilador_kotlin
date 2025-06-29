@@ -1,0 +1,5 @@
+val la = longArrayOf(10000000000,20000000000)
+fun main() {
+    println(la[0])
+    println(la[1])
+}

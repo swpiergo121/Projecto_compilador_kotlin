@@ -1,0 +1,7 @@
+class P { var x: Int = 2 }
+fun main() {
+    val p1 = P()
+    val p2 = P()
+    println(p1.x)
+    println(p2.x)
+}

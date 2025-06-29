@@ -1,6 +1,0 @@
-var g: Int = 42
-
-fun main() {
-    var local: Int = g
-    println(local)
-}

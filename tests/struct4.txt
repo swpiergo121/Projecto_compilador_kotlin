@@ -1,0 +1,6 @@
+class Inner { var v: Int = 3 }
+class Outer { var i: Inner = Inner() }
+fun main() {
+    val o = Outer()
+    println(o.i.v)
+}

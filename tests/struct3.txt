@@ -1,0 +1,6 @@
+class P { var x: Int = 0 }
+fun main() {
+    val p = P()
+    p.x = 5
+    println(p.x)
+}

@@ -1,0 +1,5 @@
+val arr = Array<Int>(4) { it * 3 }
+fun main() {
+    println(arr[0])
+    println(arr[3])
+}

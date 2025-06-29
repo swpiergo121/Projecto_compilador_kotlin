@@ -1,0 +1,5 @@
+val ba = booleanArrayOf(false, true)
+fun main() {
+    println(ba[0])
+    println(ba[1])
+}

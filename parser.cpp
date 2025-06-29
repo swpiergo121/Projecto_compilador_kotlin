@@ -199,13 +199,28 @@ FunDecList *Parser::parseFunDecList() {
 
 ClassDec *Parser::parseClassDec() {
   auto name = consume(Token::ID, "Se esperaba nombre de clase")->text;
-  // 2) paréntesis con parámetros
-  consume(Token::PI, "Se esperaba '(' tras nombre de clase");
-  auto args = parseArguments();
-  consume(Token::PD, "Se esperaba ')' tras argumentos de clase");
-  // 3) cuerpo de la clase
+  std::vector<Argument>* args = new std::vector<Argument>();
+  if (match(Token::PI)) {
+    args = parseArguments();
+    consume(Token::PD, "Se esperaba ')' tras argumentos de clase");
+  }
+  // 3) Cuerpo de la clase
   consume(Token::LBRACE, "Se esperaba '{' inicio de cuerpo de clase");
-  auto members = parseVarDecList();
+
+  // 3.a) Leemos N declaraciones var/val, separadas opcionalmente por ';'
+  VarDecList *members = new VarDecList();
+  while (check(Token::VAR) || check(Token::VAL)) {
+    // parseVarDecList consume todas las declaraciones que encuentre
+    VarDecList *partial = parseVarDecList();
+    // merge partial->vars en members->vars
+    for (auto *vd : partial->vars) {
+      members->add(vd);
+    }
+    // si hay punto y coma, lo saltamos
+    match(Token::PC);
+  }
+
+  // 3.b) Ahora sí el cierre de la clase
   consume(Token::RBRACE, "Se esperaba '}' fin de cuerpo de clase");
 
   return new ClassDec(name, *args, members);
@@ -224,10 +239,21 @@ FunDec *Parser::parseFunDec() {
     retType = consume(Token::ID, "Se esperaba tipo de retorno")->text;
   }
 
-  consume(Token::LBRACE, "Se esperaba '{' inicio de cuerpo de función");
-  Body *body = parseBody();
-  consume(Token::RBRACE, "Se esperaba '}' fin de cuerpo de función");
-
+  Body* body = nullptr;
+  if (match(Token::ASSIGN)) {
+    Exp* e = parseCExp();
+    auto *vdl = new VarDecList();
+    auto *sl  = new StatementList();
+    sl->add(new ReturnStatement(e));
+    body = new Body(vdl, sl);
+  }
+  else if (match(Token::LBRACE)) {
+    body = parseBody();
+    consume(Token::RBRACE, "Se esperaba '}' fin de cuerpo de función");
+  } else {
+    error("Se esperaba '=' o '{' inicio de cuerpo de función");
+  }
+  
   return new FunDec(name, retType, *params, body);
 }
 
@@ -340,19 +366,34 @@ Stm* Parser::parseStmt() {
     }
     // -- 4) if / while / for ...
     if (match(Token::IF)) {
-        consume(Token::PI, "Se esperaba '(' en if");
-        auto cond = parseCExp();
-        consume(Token::PD, "Se esperaba ')' en if");
-        consume(Token::LBRACE, "Se esperaba '{' tras if");
-        auto thenB = parseBody();
+      consume(Token::PI, "Se esperaba '(' en if");
+      Exp* cond = parseCExp();
+      consume(Token::PD, "Se esperaba ')' en if");
+      Body* thenB = nullptr;
+      if (match(Token::LBRACE)) {
+        thenB = parseBody();
         consume(Token::RBRACE, "Se esperaba '}' fin then");
-        Body* elseB = nullptr;
-        if (match(Token::ELSE)) {
-            consume(Token::LBRACE, "Se esperaba '{' tras else");
-            elseB = parseBody();
-            consume(Token::RBRACE, "Se esperaba '}' fin else");
+      } else {
+        Stm* s = parseStmt();
+        auto* vdl = new VarDecList();
+        auto* sl  = new StatementList();
+        sl->add(s);
+        thenB = new Body(vdl, sl);
+      }
+      Body* elseB = nullptr;
+      if (match(Token::ELSE)) {
+        if (match(Token::LBRACE)) {
+          elseB = parseBody();
+          consume(Token::RBRACE, "Se esperaba '}' fin else");
+        } else {
+          Stm* s = parseStmt();
+          auto* vdl = new VarDecList();
+          auto* sl  = new StatementList();
+          sl->add(s);
+          elseB = new Body(vdl, sl);
         }
-        return new IfStatement(cond, thenB, elseB);
+      }
+      return new IfStatement(cond, thenB, elseB);
     }
     if (match(Token::WHILE)) {
         consume(Token::PI, "Se esperaba '(' en while");
@@ -513,16 +554,15 @@ Exp *Parser::parseFactor() {
     return le;
   }
 
-  // dentro de Parser::parseFactor(), antes de la rama de listOf/arrayOf...
+  // 4) Array<T>(n) { lambda }  → siempre con 'it' implícito
   else if (match(Token::ID, "Array")) {
-    // 1) Saltar posibles parámetros genéricos: <Long>, <String>, etc.
+    // 1) Saltar genéricos <T>
     if (match(Token::LT)) {
-      // consume todo hasta '>'
       while (!check(Token::GT) && !isAtEnd()) advance();
       consume(Token::GT, "Se esperaba '>' tras parámetro genérico de Array");
     }
 
-    // 2) Leer el size
+    // 2) Leer tamaño n
     consume(Token::PI, "Se esperaba '(' tras Array");
     Exp* sizeExp = parseCExp();
     auto *num = dynamic_cast<NumberExp*>(sizeExp);
@@ -530,33 +570,20 @@ Exp *Parser::parseFactor() {
     int n = num->value;
     consume(Token::PD, "Se esperaba ')' tras tamaño de Array");
 
-    // 3) Leer la lambda de inicialización
+    // 3) Leer lambda { it * ... }
     consume(Token::LBRACE, "Se esperaba '{' tras Array(...)");
-    // posibilidad de parámetro nombrado: { i -> expr } o solo { expr } 
-    std::string param = "it";
-    if (match(Token::ID)) {
-      // capturamos el nombre del parámetro
-      param = previous->text;        // p.ej. "i"
-      // en lugar de ARROW, reconocemos '-' seguido de '>'
-      if (match(Token::MINUS)) {
-        consume(Token::GT, "Se esperaba '>' tras '-' en lambda");
-      } else {
-        error("Se esperaba '->' tras nombre de parámetro en lambda");
-      }
-    }
     Exp* body = parseCExp();
     consume(Token::RBRACE, "Se esperaba '}' al final de la lambda de Array");
 
-    // 4) Construir el ListExp con sustitución
+    // 4) Expande a ListExp con 'it' implícito
     auto *le = new ListExp(false);
     for (int i = 0; i < n; ++i) {
       std::function<Exp*(Exp*)> subst = [&](Exp* e)->Exp* {
         if (auto *v = dynamic_cast<IdentifierExp*>(e)) {
-          if (v->name == param) return new NumberExp(i);
+          if (v->name == "it") return new NumberExp(i);
           return new IdentifierExp(v->name);
         }
         if (auto *b = dynamic_cast<BinaryExp*>(e)) {
-          // BinaryExp(left, right, op)
           return new BinaryExp(
             subst(b->left),
             subst(b->right),
@@ -566,12 +593,10 @@ Exp *Parser::parseFactor() {
         if (auto *n2 = dynamic_cast<NumberExp*>(e)) {
           return new NumberExp(n2->value);
         }
-        // agrega aquí más casos si tu AST tiene otros Exp
         return nullptr;
       };
       le->add(subst(body));
     }
-
     return le;
   }
 

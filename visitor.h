@@ -137,6 +137,7 @@ class EVALVisitor : public Visitor {
   // Para saber el orden de los campos de cada clase
   // class ->
   std::unordered_map<std::string, std::vector<std::string>> classFields_;
+  std::unordered_map<std::string, std::vector<Exp*>> classFieldInits_; // nombre de clase → expresiones iniciales
   // “Heap” de objetos: objectId -> map(campo -> valor)
   std::unordered_map<int, std::unordered_map<std::string, int>> objectHeap;
 

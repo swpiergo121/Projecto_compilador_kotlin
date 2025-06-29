@@ -1,0 +1,4 @@
+val s: String = "hello"
+fun main() {
+    println(s)
+}

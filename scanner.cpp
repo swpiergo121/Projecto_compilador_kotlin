@@ -32,16 +32,19 @@ Token *Scanner::nextToken() {
 
   // Números
   if (isdigit(c)) {
-    bool isFloat = false;
+  bool isFloat = false;
+  current++;
+  while (current < input.size() && isdigit(input[current]))
     current++;
+  // solo consumir '.' como parte del número si tras él hay un dígito
+  if (current + 1 < input.size()
+      && input[current] == '.'
+      && isdigit(input[current+1])) {
+    isFloat = true;
+    current++;  // consume '.'
     while (current < input.size() && isdigit(input[current]))
       current++;
-    if (current < input.size() && input[current] == '.') {
-      isFloat = true;
-      current++;
-      while (current < input.size() && isdigit(input[current]))
-        current++;
-    }
+  }
     std::string txt = input.substr(first, current - first);
     return new Token(Token::NUM, txt, 0, txt.size());
   }
