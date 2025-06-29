@@ -32,11 +32,18 @@ Token *Scanner::nextToken() {
 
   // Números
   if (isdigit(c)) {
+    bool isFloat = false;
     current++;
-    while (current < (int)input.size() && isdigit(input[current]))
+    while (current < input.size() && isdigit(input[current]))
       current++;
+    if (current < input.size() && input[current] == '.') {
+      isFloat = true;
+      current++;
+      while (current < input.size() && isdigit(input[current]))
+        current++;
+    }
     std::string txt = input.substr(first, current - first);
-    return new Token(Token::NUM, txt, 0, (int)txt.size());
+    return new Token(Token::NUM, txt, 0, txt.size());
   }
 
   // Identificadores y palabras reservadas

@@ -6,6 +6,7 @@
 #include "exp.h"
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 
 class Program;
 class VarDecList;
@@ -228,14 +229,20 @@ private:
   unordered_map<string, bool> memoriaGlobal;
   std::unordered_map<std::string, std::string> memoriaTypes_;
 
-  std::unordered_map<std::string, std::unordered_map<std::string, int>>
-      structLayouts_;
+  std::unordered_map<std::string, std::unordered_map<std::string, int>> structLayouts_;
   std::string newLabel(const std::string &prefix);
 
   // para strings en listOf:
   std::unordered_map<std::string, std::string> stringLabel_; // literal -> label
   // para longitudes:
   std::unordered_map<std::string, int> listLength_; // varName -> n
+
+  // Mapa nuevo: nombre de lista global → su ListExp*
+  unordered_map<string, ListExp*> globalInits_;
+
+  // Mapa para booleans
+  unordered_map<std::string,int> elemSize_;
+  unordered_set<std::string> booleanArrs_; 
 };
 
 #endif // VISITOR_H

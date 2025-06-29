@@ -206,8 +206,7 @@ public:
   vector<string> names;
   string typeName;
   vector<Exp *> inits;
-  VarDec(bool isMutable_, const vector<string> &names_, const string typeNames_,
-         vector<Exp *> &inits_);
+  VarDec(bool isMutable_, const vector<string> &names_, const string typeNames_, vector<Exp *> &inits_);
   int accept(Visitor *v);
   ~VarDec();
 };
