@@ -7,6 +7,7 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <sstream>
 
 class Program;
 class VarDecList;
@@ -231,7 +232,11 @@ private:
   unordered_map<string, bool> memoriaGlobal;
   std::unordered_map<std::string, std::string> memoriaTypes_;
 
+  std::ostringstream out_rodata_;
+
   std::unordered_map<std::string, std::unordered_map<std::string, int>> structLayouts_;
+  std::unordered_map<std::string,std::unordered_map<std::string,std::string>> structFieldTypes_;
+
   std::string newLabel(const std::string &prefix);
 
   // para strings en listOf:

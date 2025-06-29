@@ -1,6 +1,8 @@
+  movq $1234567890123, %rax
 .data
 print_fmt: .string "%ld\n"
 
+b: .quad 1234567890123
 
 .text
 
@@ -11,10 +13,7 @@ main:
 
 
 
-  movq $5, %rax
-  pushq %rax
-  movq $3, %rax
-  popq %rcx
+  movq b(%rip), %rax
   movq %rax, %rsi
   leaq print_fmt(%rip), %rdi
   movl $0, %eax

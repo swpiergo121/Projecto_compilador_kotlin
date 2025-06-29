@@ -31,7 +31,4 @@ Lfor0:
   movq %rax, -16(%rbp)
   jmp Lfor0
 Lfe1:
-  leave
-  ret
-
 .section .note.GNU-stack,"",@progbits

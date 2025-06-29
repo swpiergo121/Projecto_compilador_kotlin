@@ -482,7 +482,7 @@ Exp *Parser::parseFactor() {
   } else if (match(Token::STRING)) {
     return new StringExp(previous->text);
   } else if (match(Token::NUM)) {
-    return new NumberExp(stoi(previous->text));
+    return new NumberExp(stoll(previous->text));
   }
 
   // 2) IntArray(size) { it -> ... }

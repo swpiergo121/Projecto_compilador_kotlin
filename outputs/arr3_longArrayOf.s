@@ -10,25 +10,30 @@ main:
   movq %rsp, %rbp
 
 
-  subq $8, %rsp
 
   movq $16, %rdi
   call malloc@PLT
   movq %rax, %rbx
-  movq %rbx, %rax
-  movq %rax, -8(%rbp)
+  movq $10000000000, %rax
+  movq %rax, 0(%rbx)
+  movq $20000000000, %rax
+  movq %rax, 8(%rbx)
+  movq %rbx, la(%rip)
 
-  movq -8(%rbp), %rax
-  movq %rax, %rbx
-  movq (%rbx), %rax
+  movq $0, %rax
+  movq la(%rip), %rbx
+  salq $3, %rax
+  addq   %rax, %rbx
+  movq   (%rbx), %rax
   movq %rax, %rsi
   leaq print_fmt(%rip), %rdi
   movl $0, %eax
   call printf@PLT
-  movq -8(%rbp), %rax
-  movq %rax, %rbx
-  addq $8, %rbx
-  movq (%rbx), %rax
+  movq $1, %rax
+  movq la(%rip), %rbx
+  salq $3, %rax
+  addq   %rax, %rbx
+  movq   (%rbx), %rax
   movq %rax, %rsi
   leaq print_fmt(%rip), %rdi
   movl $0, %eax

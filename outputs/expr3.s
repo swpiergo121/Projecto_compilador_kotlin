@@ -14,20 +14,18 @@ main:
   movq $10, %rax
   pushq %rax
   movq $2, %rax
-  movq %rax, %rcx
-  popq %rax
+  popq %rcx
+  subq %rcx, %rax
   movq %rcx, %rax
   pushq %rax
   movq $4, %rax
-  movq %rax, %rcx
-  popq %rax
+  popq %rcx
+  movq %rcx, %rdx
   cqto
-  idivq %rcx
+  idivq %rax
+  movq %rdx, %rax
   movq %rax, %rsi
   leaq print_fmt(%rip), %rdi
   movl $0, %eax
   call printf@PLT
-  leave
-  ret
-
 .section .note.GNU-stack,"",@progbits

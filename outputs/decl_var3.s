@@ -5,7 +5,7 @@ str0: .string "hello"
 .data
 print_fmt: .string "%ld\n"
 
-s: .quad 0
+s: .quad str0
 
 .text
 
@@ -15,18 +15,10 @@ main:
   movq %rsp, %rbp
 
 
-  movq $0, %rdi
-  call malloc@PLT
-  movq %rax, %rbx
-  movq %rbx, s(%rip)
-
 
   movq s(%rip), %rax
   movq %rax, %rsi
   leaq print_fmt(%rip), %rdi
   movl $0, %eax
   call printf@PLT
-  leave
-  ret
-
 .section .note.GNU-stack,"",@progbits

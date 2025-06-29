@@ -102,7 +102,7 @@ BinaryExp::BinaryExp(Exp *left, Exp *right, BinaryOp op)
 IFExp::IFExp(Exp *cond, Exp *left, Exp *right)
     : cond(cond), left(left), right(right) {}
 // NumberExp
-NumberExp::NumberExp(int value) : value(value) {}
+NumberExp::NumberExp(long long value) : value(value) {}
 
 // BoolExp
 BoolExp::BoolExp(bool value) : value(value) {}

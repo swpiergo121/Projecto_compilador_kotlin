@@ -1,7 +1,6 @@
 .data
 print_fmt: .string "%ld\n"
 
-arr: .quad 0
 
 .text
 
@@ -9,6 +8,7 @@ arr: .quad 0
 main:
   pushq %rbp
   movq %rsp, %rbp
+
 
 
   movq $24, %rdi
@@ -21,7 +21,6 @@ main:
   movq $3, %rax
   movq %rax, 16(%rbx)
   movq %rbx, arr(%rip)
-
 
   movq $0, -8(%rbp)
   movq arr(%rip), %r14
@@ -44,7 +43,4 @@ Lfor0:
   movq %rax, -8(%rbp)
   jmp Lfor0
 Lend1:
-  leave
-  ret
-
 .section .note.GNU-stack,"",@progbits

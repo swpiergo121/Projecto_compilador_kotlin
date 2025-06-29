@@ -52,8 +52,8 @@ public:
 
 class NumberExp : public Exp {
 public:
-  int value;
-  NumberExp(int value);
+  long long value;
+  NumberExp(long long value);
   int accept(Visitor *v) override;
   ~NumberExp();
 };

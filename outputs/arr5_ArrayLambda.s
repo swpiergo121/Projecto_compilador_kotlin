@@ -1,7 +1,6 @@
 .data
 print_fmt: .string "%ld\n"
 
-arr: .quad 0
 
 .text
 
@@ -11,39 +10,35 @@ main:
   movq %rsp, %rbp
 
 
+
   movq $32, %rdi
   call malloc@PLT
   movq %rax, %rbx
   movq $0, %rax
   pushq %rax
   movq $3, %rax
-  movq %rax, %rcx
-  popq %rax
+  popq %rcx
   imulq %rcx, %rax
   movq %rax, 0(%rbx)
   movq $1, %rax
   pushq %rax
   movq $3, %rax
-  movq %rax, %rcx
-  popq %rax
+  popq %rcx
   imulq %rcx, %rax
   movq %rax, 8(%rbx)
   movq $2, %rax
   pushq %rax
   movq $3, %rax
-  movq %rax, %rcx
-  popq %rax
+  popq %rcx
   imulq %rcx, %rax
   movq %rax, 16(%rbx)
   movq $3, %rax
   pushq %rax
   movq $3, %rax
-  movq %rax, %rcx
-  popq %rax
+  popq %rcx
   imulq %rcx, %rax
   movq %rax, 24(%rbx)
   movq %rbx, arr(%rip)
-
 
   movq $0, %rax
   movq arr(%rip), %rbx
@@ -63,7 +58,4 @@ main:
   leaq print_fmt(%rip), %rdi
   movl $0, %eax
   call printf@PLT
-  leave
-  ret
-
 .section .note.GNU-stack,"",@progbits

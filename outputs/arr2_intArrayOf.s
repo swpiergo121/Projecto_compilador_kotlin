@@ -1,7 +1,6 @@
 .data
 print_fmt: .string "%ld\n"
 
-ia: .quad 0
 
 .text
 
@@ -9,6 +8,7 @@ ia: .quad 0
 main:
   pushq %rbp
   movq %rsp, %rbp
+
 
 
   movq $24, %rdi
@@ -21,7 +21,6 @@ main:
   movq $9, %rax
   movq %rax, 16(%rbx)
   movq %rbx, ia(%rip)
-
 
   movq $0, %rax
   movq ia(%rip), %rbx
@@ -41,7 +40,4 @@ main:
   leaq print_fmt(%rip), %rdi
   movl $0, %eax
   call printf@PLT
-  leave
-  ret
-
 .section .note.GNU-stack,"",@progbits

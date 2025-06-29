@@ -17,13 +17,10 @@ f:
   movq -8(%rbp), %rax
   pushq %rax
   movq $2, %rax
-  movq %rax, %rcx
-  popq %rax
+  popq %rcx
   imulq %rcx, %rax
- jmp .end_
   leave
   ret
-
 .globl main
 main:
   pushq %rbp
@@ -39,7 +36,4 @@ main:
   leaq print_fmt(%rip), %rdi
   movl $0, %eax
   call printf@PLT
-  leave
-  ret
-
 .section .note.GNU-stack,"",@progbits
