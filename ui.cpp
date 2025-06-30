@@ -206,6 +206,21 @@ int main() {
         }
         if (buttonSave.isClicked(mousePos)) {
           // Save file to path
+          // 1. Save to file
+          string asm_path = "assets/out.s";
+          ofstream asm_file(asm_path);
+          if (!asm_file.is_open()) {
+            resultAssembly.setText(
+                "Error: Could not open temp file for writing.");
+            resultAssembly.updateTextDisplay();
+            asm_file.close();
+            resultAssembly.setText("Assembly code saved in:" + asm_path +
+                                   ".\n");
+            resultAssembly.updateTextDisplay();
+            continue;
+          }
+          asm_file << assemblyCode.currentText;
+          asm_file.close();
         }
       }
     }
