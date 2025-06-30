@@ -165,7 +165,6 @@ public:
       if (event.mouseButton.button == sf::Mouse::Left) {
         isActive = isMouseOver(background.getGlobalBounds(), mousePos);
         if (isActive) {
-          std::cout << "Text block activated." << std::endl;
         }
       }
     } else if (event.type == sf::Event::MouseWheelScrolled && isActive) {
@@ -207,7 +206,6 @@ public:
       if (event.mouseButton.button == sf::Mouse::Left) {
         isActive = isMouseOver(background.getGlobalBounds(), mousePos);
         if (isActive) {
-          std::cout << "Text block activated." << std::endl;
           cursorBlinkClock.restart();
           showCursor = true;
 
@@ -459,8 +457,6 @@ public:
             text.setString(
                 items[selectedIndex]); // Update button text to selected item
             isOpen = false;            // Close dropdown after selection
-            std::cout << "Dropdown selected: " << items[selectedIndex]
-                      << std::endl;
             break;
           }
         }

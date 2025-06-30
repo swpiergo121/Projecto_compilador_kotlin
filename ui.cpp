@@ -124,7 +124,6 @@ int main() {
                           dropdownButton.items[dropdownButton.selectedIndex];
             ifstream infile(path);
             if (!infile.is_open()) {
-              cout << "No se pudo abrir el archivo: " << path << endl;
               exit(1);
             }
 
@@ -138,8 +137,6 @@ int main() {
             kotlinEditor.setText(input);
             kotlinEditor.updateTextDisplayCursor();
           }
-
-          std::cout << "Button load Clicked!" << std::endl;
         }
         if (buttonRun.isClicked(mousePos)) {
           Scanner scanner(kotlinEditor.getText().c_str());
@@ -157,7 +154,6 @@ int main() {
             resultAssembly.setText("File couldn't be parsed correctly");
             resultAssembly.updateTextDisplay();
           }
-          std::cout << "Button run Clicked!" << std::endl;
         }
         if (buttonExecute.isClicked(mousePos)) {
           // 1. Save to file
@@ -207,11 +203,9 @@ int main() {
           std::remove(asm_path.c_str());
           std::remove(obj_path.c_str());
           std::remove(out_path.c_str());
-
-          std::cout << "Button execute Clicked!" << std::endl;
         }
         if (buttonSave.isClicked(mousePos)) {
-          std::cout << "Button save Clicked!" << std::endl;
+          // Save file to path
         }
       }
     }

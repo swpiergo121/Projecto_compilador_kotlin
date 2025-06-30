@@ -796,7 +796,7 @@ template <typename T> int GenCodeVisitor<T>::visit(BinaryExp *e) {
   case LT_OP:
     out_ << " cmpq %rcx, %rax\n"
          << " movl $0, %eax\n"
-         << " setle %al\n"
+         << " setl %al\n"
          << " movzbq %al, %rax\n";
     break;
   case LE_OP:
@@ -1073,8 +1073,8 @@ template <typename T> void GenCodeVisitor<T>::visit(IfStatement *s) {
 }
 
 template <typename T> void GenCodeVisitor<T>::visit(WhileStatement *s) {
-  auto Lbegin = newLabel("Lwb");
-  auto Lend = newLabel("Lwe");
+  auto Lbegin = newLabel("while");
+  auto Lend = newLabel("endwhile");
   out_ << Lbegin << ":\n";
   s->cond->accept(this);
   out_ << "  cmpq $0, %rax\n";
@@ -1085,14 +1085,11 @@ template <typename T> void GenCodeVisitor<T>::visit(WhileStatement *s) {
 }
 
 template <typename T> void GenCodeVisitor<T>::visit(ForStatement *s) {
-  // 1) Crear espacio para el índice
-  stackSize_ += 8;
-  int idxOff = -stackSize_;
-  memoriaIndex_["__idx" + s->varName] = idxOff;
-
-  // 2) Crear espacio para la variable de iteración
+  // 1) Crear espacio para la variable de iteración
   stackSize_ += 8;
   memoria[s->varName] = -stackSize_;
+  out_ << " subq $" << 8 << ", %rsp" << endl;
+
   // 2) Distinguir rango numérico o lista
   if (auto loop = dynamic_cast<LoopExp *>(s->iterable)) {
     // 2.1) Define the start, the end and the step to make the comparisons
@@ -1101,7 +1098,7 @@ template <typename T> void GenCodeVisitor<T>::visit(ForStatement *s) {
     // To Optimize and not call the expression each loop, we can save the end
     // and the step in a register
     loop->end->accept(this); // -> %rax
-    out_ << " movq % rax, % r11\n ";
+    out_ << " movq %rax, %r11\n ";
     loop->step->accept(this);
     if (loop->downTo) {
       out_ << "  negq %rax\n";
@@ -1113,13 +1110,15 @@ template <typename T> void GenCodeVisitor<T>::visit(ForStatement *s) {
     auto Lend = newLabel("endfor");
     out_ << Lfor << ":\n";
     // cargar i
-    out_ << "  movq " << memoria[s->varName] << "(%rbp), %rcx\n";
+    out_ << "  movq " << memoria[s->varName] << "(%rbp), %rax\n";
+    // compare like with a binary expression with equal
     // comparar con end. %r11 or accept
-    out_ << "  cmpq %r11, %rcx\n";
-    if (loop->downTo)
-      out_ << "  jle " << Lend << "\n";
-    else
-      out_ << "  jge " << Lend << "\n";
+    out_ << "  cmpq %r11, %rax\n"
+            "  sete %al\n"
+            "  movzbq %al, %rax\n";
+    // The 1 for it to be true
+    out_ << "  cmpq 1, %rax\n";
+    out_ << "  je " << Lend << "\n";
     // cuerpo
     s->body->accept(this);
     // i += step
@@ -1130,7 +1129,7 @@ template <typename T> void GenCodeVisitor<T>::visit(ForStatement *s) {
     out_ << Lend << ":\n";
   } else {
     // 1) inicializar índice = 0
-    out_ << "  movq $0, " << idxOff << "(%rbp)\n";
+    out_ << "  movq $0, " << memoriaIndex_[s->varName] << "(%rbp)\n";
 
     // 2) cargar sólo UNA VEZ la dirección base del array en %r14
     auto id = static_cast<IdentifierExp *>(s->iterable);
@@ -1155,13 +1154,13 @@ template <typename T> void GenCodeVisitor<T>::visit(ForStatement *s) {
     out_ << Lfor
          << ":\n"
          // cargar índice
-         << "  movq " << idxOff << "(%rbp), %rax\n"
+         << "  movq " << memoriaIndex_[s->varName] << "(%rbp), %rax\n"
          << "  cmpq $" << n << ", %rax\n"
          << "  jge " << Lend
          << "\n"
 
          // calcular dirección en %rdx
-         << "  movq " << idxOff << "(%rbp), %rdx\n"
+         << "  movq " << memoriaIndex_[s->varName] << "(%rbp), %rdx\n"
          << "  salq $3, %rdx\n"
          << "  addq %r14, %rdx\n"
 
@@ -1173,9 +1172,9 @@ template <typename T> void GenCodeVisitor<T>::visit(ForStatement *s) {
     s->body->accept(this);
 
     // 9) incrementar índice y saltar
-    out_ << "  movq " << idxOff << "(%rbp), %rax\n"
+    out_ << "  movq " << memoriaIndex_[s->varName] << "(%rbp), %rax\n"
          << "  addq $1, %rax\n"
-         << "  movq %rax, " << idxOff << "(%rbp)\n"
+         << "  movq %rax, " << memoriaIndex_[s->varName] << "(%rbp)\n"
          << "  jmp " << Lfor << "\n"
          << Lend << ":\n";
   }
@@ -1268,57 +1267,8 @@ template <typename T> void GenCodeVisitor<T>::visit(FunDec *f) {
   }
   out_ << "\n";
 
-  // 1. Reserva espacio para las variables locales
-  f->body->vardecs->accept(this);
-  if (stackSize_ > 0) {
-    out_ << "  subq $" << stackSize_ << ", %rsp\n\n";
-  }
-
-  // 2. Inicializa las variables locales con sus valores
-  for (auto *d : f->body->vardecs->vars) {
-    for (size_t i = 0; i < d->inits.size(); ++i) {
-      if (!d->inits[i])
-        continue;
-      d->inits[i]->accept(this); // calcula el valor → %rax
-      out_ << "  movq %rax, " << memoria[d->names[i]] << "(%rbp)\n";
-    }
-  }
-  out_ << "\n";
-
-  // inicialización de listas globales (si es main)
-  if (f->name == "main") {
-    for (auto &pr : memoriaGlobal) {
-      const std::string &name = pr.first;
-
-      // Solo inicializar en main si es una lista o array (es decir, está en
-      // globalInits_)
-      if (globalInits_.count(name)) {
-        int n = listLength_.at(name);     // longitud
-        auto *le = globalInits_.at(name); // ListExp*
-        int esz = elemSize_.at(name);
-
-        // a) reservar heap
-        out_ << "  movq $" << (n * esz) << ", %rdi\n"
-             << "  call malloc@PLT\n"
-             << "  movq %rax, %rbx\n";
-
-        // b) escribir literales en el bloque
-        for (int i = 0; i < n; ++i) {
-          le->elements[i]->accept(this); // deja valor en %rax
-          if (esz == 1) {
-            out_ << "  movb %al, " << (i * esz) << "(%rbx)\n";
-          } else {
-            out_ << "  movq %rax, " << (i * esz) << "(%rbx)\n";
-          }
-        }
-        // c) guardar puntero en la etiqueta global
-        out_ << "  movq %rbx, " << name << "(%rip)\n\n";
-      }
-    }
-  }
-
-  // cuerpo de la función, para statements
   f->body->accept(this);
+
   out_ << ".end_" << f->name << ":" << endl;
   out_ << "leave" << endl;
   out_ << "ret" << endl;
@@ -1357,7 +1307,56 @@ template <typename T> void GenCodeVisitor<T>::visit(StatementList *l) {
 }
 
 template <typename T> void GenCodeVisitor<T>::visit(Body *b) {
-  // b->vardecs->accept(this);
+  // 1. Reserva para las variables
+  b->vardecs->accept(this);
+  if (stackSize_ > 0) {
+    out_ << "  subq $" << stackSize_ << ", %rsp\n\n";
+  }
+
+  // 2. Inicializa las variables locales con sus valores
+  for (auto *d : b->vardecs->vars) {
+    for (size_t i = 0; i < d->inits.size(); ++i) {
+      if (!d->inits[i])
+        continue;
+      d->inits[i]->accept(this); // calcula el valor → %rax
+      out_ << "  movq %rax, " << memoria[d->names[i]] << "(%rbp)\n";
+    }
+  }
+  out_ << "\n";
+
+  // inicialización de listas globales (si es main)
+  if (this->nombreFuncion == "main") {
+    for (auto &pr : memoriaGlobal) {
+      const std::string &name = pr.first;
+
+      // Solo inicializar en main si es una lista o array (es decir, está en
+      // globalInits_)
+      if (globalInits_.count(name)) {
+        int n = listLength_.at(name);     // longitud
+        auto *le = globalInits_.at(name); // ListExp*
+        int esz = elemSize_.at(name);
+
+        // a) reservar heap
+        out_ << "  movq $" << (n * esz) << ", %rdi\n"
+             << "  call malloc@PLT\n"
+             << "  movq %rax, %rbx\n";
+
+        // b) escribir literales en el bloque
+        for (int i = 0; i < n; ++i) {
+          le->elements[i]->accept(this); // deja valor en %rax
+          if (esz == 1) {
+            out_ << "  movb %al, " << (i * esz) << "(%rbx)\n";
+          } else {
+            out_ << "  movq %rax, " << (i * esz) << "(%rbx)\n";
+          }
+        }
+        // c) guardar puntero en la etiqueta global
+        out_ << "  movq %rbx, " << name << "(%rip)\n\n";
+      }
+    }
+  }
+
+  // 3. Acepta statements
   b->stmts->accept(this);
 }
 
