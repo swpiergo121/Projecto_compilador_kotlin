@@ -956,16 +956,20 @@ template <typename T> int GenCodeVisitor<T>::visit(FCallExp *e) {
   auto it = structLayouts_.find(e->name);
   if (it != structLayouts_.end()) {
     // número de campos
-    // 1. First, unload the args, assume the args are only for the constructor,
-    // so the args of call and class are equal Then go for variables
-    // TODO
-    int nFields = (int)it->second.size();
-    // malloc(nFields*8)
+    // 1. Sum number of variables and number of variables declared
+    int nFields = structLayouts_[e->name].size();
+    // 2. Reserver memory
     out_ << "  movq $" << (nFields * 8) << ", %rdi\n"
          << "  call malloc@PLT\n"
          << "  pushq %rax\n";
+    // 3. Unload the args, assume the args are only for the constructor,
+    // so the args of call and class are equal Then go for variables
+    // TODO
     // llenar cada campo: args[i] → offset i*8
-    for (size_t i = 0; i < e->args.size(); ++i) {
+    int nFieldsConstructor = structFieldConstructorsOrder_.size();
+    for (size_t i = 0; i < nFieldsConstructor; ++i) {
+      string fieldName = structFieldConstructorsOrder_[e->name][i];
+      int offField = structLayouts_[e->name][fieldName];
       out_ << "  pushq %rax\n";
       e->args[i]->accept(this); // → %rax = valor de arg
       // Saves result in rcx
@@ -973,25 +977,30 @@ template <typename T> int GenCodeVisitor<T>::visit(FCallExp *e) {
       // Pops to have the rax pointer saved at the start
       out_ << "  popq %rax\n";
       // Uses rax to access the index values
-      out_ << "  movq %rcx, " << (i * 8) << "(%rax)\n";
+      out_ << "  movq %rcx, " << offField << "(%rax)\n";
       // Pops the rax declared at the start of the loop
       out_ << "  popq %rax\n";
     }
-    // Variables inside
-    for (size_t i = 0; i < e->args.size(); ++i) {
+
+    // 4. Init variables
+    for (auto v : structFieldInits_[e->name]) {
+      int offField = structLayouts_[e->name][v.first];
       out_ << "  pushq %rax\n";
-      e->args[i]->accept(this); // → %rax = valor de arg
+      v.second->accept(this); // → %rax = valor de arg
       // Saves result in rcx
       out_ << "  movq %rax, %rcx\n";
       // Pops to have the rax pointer saved at the start
       out_ << "  popq %rax\n";
       // Uses rax to access the index values
-      out_ << "  movq %rcx, " << (i * 8) << "(%rax)\n";
+      out_ << "  movq %rcx, " << offField << "(%rax)\n";
       // Pops the rax declared at the start of the loop
       out_ << "  popq %rax\n";
     }
-    // Pops to have the rax pointer
-    out_ << "  popq %rax\n";
+
+    // 5. Check if there are problems with fields that start without values
+    // TODO
+    // 6. Dont' forget to clean!!!
+    // TODO
     return 0;
   } else {
     // fun call
@@ -1042,14 +1051,11 @@ template <typename T> void GenCodeVisitor<T>::visit(AssignStatement *s) {
   } else if (auto dot = dynamic_cast<DotExp *>(s->target)) {
     // 4) caso struct.field
     // evaluar objeto para dejar puntero en %rax
-    int off = memoria.at(idx->name);
-    cout << "--- off: " << off << endl;
+    int off = memoria.at(dot->id);
 
     // offset del campo
-    string structType = memoriaTypes_.at(idx->name);
-    cout << "--- structType: " << structType << endl;
+    string structType = memoriaTypes_.at(dot->id);
     int fldOff = structLayouts_.at(structType).at(dot->member);
-    cout << "--- fldOff: " << fldOff << endl;
 
     // escribir el valor
     out_ << "  movq " << -off << "(%rbp)" << ", %rcx\n";
@@ -1103,6 +1109,10 @@ template <typename T> void GenCodeVisitor<T>::visit(ForStatement *s) {
 
   // 2) Distinguir rango numérico o lista
   if (auto loop = dynamic_cast<LoopExp *>(s->iterable)) {
+    // Not working correctly? Haven't tested completely with the latest
+    // modification
+    // TODO
+
     // 2.1) Define the start, the end and the step to make the comparisons
     loop->start->accept(this); // -> %rax
     out_ << "  movq %rax, " << memoria[s->varName] << "(%rbp)\n";
@@ -1146,6 +1156,8 @@ template <typename T> void GenCodeVisitor<T>::visit(ForStatement *s) {
     out_ << "  jmp " << Lfor << "\n";
     out_ << Lend << ":\n";
   } else {
+    // Not working in general
+    // TODO
     // 1) inicializar índice = 0
     out_ << "  movq $0, " << memoriaIndex_[s->varName] << "(%rbp)\n";
 
