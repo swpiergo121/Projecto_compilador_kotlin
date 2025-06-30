@@ -1,4 +1,5 @@
 #include <SFML/Graphics.hpp>
+#include <SFML/Graphics/RenderWindow.hpp>
 #include <SFML/Window.hpp>
 #include <iostream>
 #include <sstream>
@@ -12,41 +13,35 @@ const int WINDOW_WIDTH = 1200;
 const int WINDOW_HEIGHT = 800;
 const float PADDING = 20.0f;
 const float BUTTON_HEIGHT = 40.0f;
-const float BUTTON_WIDTH = 150.0f;
+const float BUTTON_WIDTH = 100.0f;
+const float BUTTON_DROPDOWN_WIDTH = 250.0f;
 const float DROPDOWN_ITEM_HEIGHT = 30.0f;
 const int FONT_SIZE = 18;
 const int TEXT_BLOCK_LINE_HEIGHT = 24; // Approximate line height for scrolling
 const float TEXT_BLOCK_INTERNAL_PADDING = 5.0f; // Padding inside the text block
 const float RESULT_HEIGHT_BOX = 100.0f;
 const string PREFIX_INPUT = "tests/";
+const float CURSOR_WIDTH = 2.0f;
+const float CURSOR_BLINK_RATE = 0.5f; // Seconds
 
-// std::string exec_and_capture(const std::string &cmd) {
-//   std::string result = "";
-// #ifdef _WIN32
-//   // Windows specific: Use _popen and _pclose
-//   FILE *pipe = _popen(cmd.c_str(), "r");
-//   if (!pipe) {
-//     return "ERROR: _popen failed!";
-//   }
-//   char buffer[128];
-//   while (fgets(buffer, sizeof(buffer), pipe) != nullptr) {
-//     result += buffer;
-//   }
-//   _pclose(pipe);
-// #else
-//   // Linux/Unix specific: Use popen and pclose
-//   FILE *pipe = popen(cmd.c_str(), "r");
-//   if (!pipe) {
-//     return "ERROR: popen failed!";
-//   }
-//   char buffer[128];
-//   while (fgets(buffer, sizeof(buffer), pipe) != nullptr) {
-//     result += buffer;
-//   }
-//   pclose(pipe);
-// #endif
-//   return result;
-// }
+std::string exec_and_capture(const std::string &cmd) {
+  std::string result = "";
+
+  // For Windows: Use _popen and _pclose
+  // FILE *pipe = _popen(cmd.c_str(), "r");
+  FILE *pipe = popen(cmd.c_str(), "r");
+  if (!pipe) {
+    return "ERROR: popen failed!";
+  }
+  char buffer[128];
+  while (fgets(buffer, sizeof(buffer), pipe) != nullptr) {
+    result += buffer;
+  }
+  pclose(pipe);
+  // For windows
+  // _pclose(pipe);
+  return result;
+}
 
 string get_before_dot(string input) {
   // Find the position of the first occurrence of '.'
@@ -190,8 +185,22 @@ public:
 // --- Scrollable Text Block Class ---
 class ScrollableTextBlockEdit : public ScrollableTextBlock {
 public:
+  // Cursor related members
+  sf::RectangleShape cursorShape;
+  int cursorPosition;
+  sf::Clock cursorBlinkClock;
+  bool showCursor;
+
   ScrollableTextBlockEdit(sf::Vector2f position, sf::Vector2f size, sf::Font &f)
-      : ScrollableTextBlock(position, size, f) {}
+      : ScrollableTextBlock(position, size, f) {
+    cursorPosition = 0;
+    showCursor = true;
+
+    // Initialize cursor shape
+    cursorShape.setFillColor(sf::Color::White);
+    cursorShape.setSize(sf::Vector2f(
+        CURSOR_WIDTH, FONT_SIZE + 2)); // Height slightly more than font size
+  }
 
   void handleEvent(sf::Event event, const sf::Vector2f &mousePos) override {
     if (event.type == sf::Event::MouseButtonPressed) {
@@ -199,22 +208,129 @@ public:
         isActive = isMouseOver(background.getGlobalBounds(), mousePos);
         if (isActive) {
           std::cout << "Text block activated." << std::endl;
+          cursorBlinkClock.restart();
+          showCursor = true;
+
+          // Set cursor position based on mouse click (approximate)
+          sf::Vector2f clickPos = mousePos;
+          // Adjust clickPos to be relative to the textDisplay's top-left
+          clickPos.x -= textDisplay.getPosition().x;
+          clickPos.y -= textDisplay.getPosition().y;
+
+          // Find the character index closest to the click position
+          // This is a simplified approach and might not be pixel-perfect
+          cursorPosition = 0;
+          for (int i = 0; i < currentText.length(); ++i) {
+            sf::Vector2f charPos = textDisplay.findCharacterPos(i);
+            if (charPos.y > clickPos.y + FONT_SIZE) { // Clicked on a line below
+              break;
+            }
+            if (charPos.x < clickPos.x) {
+              cursorPosition = i + 1;
+            } else {
+              break; // Clicked before this character on the same line
+            }
+          }
+          updateTextDisplayCursor();
         }
       }
     } else if (event.type == sf::Event::TextEntered && isActive) {
       if (event.text.unicode < 128) {     // ASCII characters
         if (event.text.unicode == '\b') { // Backspace
-          if (!currentText.empty()) {
-            currentText.pop_back();
+          if (cursorPosition > 0) {
+            currentText.erase(cursorPosition - 1, 1);
+            cursorPosition--;
           }
         } else if (event.text.unicode == '\r') { // Enter key
-          currentText += '\n';
+          currentText.insert(cursorPosition, "\n");
+          cursorPosition++;
         } else {
-          currentText += static_cast<char>(event.text.unicode);
+          currentText.insert(cursorPosition, 1,
+                             static_cast<char>(event.text.unicode));
+          cursorPosition++;
         }
-        updateTextDisplay();
+        updateTextDisplayCursor();
       }
-    } else if (event.type == sf::Event::MouseWheelScrolled && isActive) {
+    } else if (event.type == sf::Event::KeyPressed && isActive) {
+      // Reset cursor blink on key press
+      cursorBlinkClock.restart();
+      showCursor = true;
+
+      if (event.key.code == sf::Keyboard::Left) {
+        if (cursorPosition > 0) {
+          cursorPosition--;
+        }
+        updateTextDisplayCursor();
+      } else if (event.key.code == sf::Keyboard::Right) {
+        if (cursorPosition < currentText.length()) {
+          cursorPosition++;
+        }
+        updateTextDisplayCursor();
+      } else if (event.key.code == sf::Keyboard::Up) {
+        // Move cursor up a line
+        // Find current line start
+        size_t currentLineStart = currentText.rfind('\n', cursorPosition);
+        if (currentLineStart == std::string::npos)
+          currentLineStart = 0;
+        else
+          currentLineStart++;
+
+        // Find previous line start
+        size_t prevLineEnd = currentText.rfind(
+            '\n', currentLineStart > 0 ? currentLineStart - 1 : 0);
+        size_t prevLineStart =
+            (prevLineEnd == std::string::npos) ? 0 : prevLineEnd + 1;
+
+        if (currentLineStart > 0) { // If not on the first line
+          size_t col =
+              cursorPosition - currentLineStart; // Column on current line
+          cursorPosition = std::min(
+              (size_t)prevLineStart + col,
+              prevLineEnd != std::string::npos
+                  ? prevLineEnd
+                  : prevLineStart + (currentLineStart - prevLineStart - 1));
+          updateTextDisplayCursor();
+        } else {
+          cursorPosition = 0; // Already at the top
+          updateTextDisplayCursor();
+        }
+      } else if (event.key.code == sf::Keyboard::Down) {
+        // Move cursor down a line
+        // Find current line end
+        size_t currentLineEnd = currentText.find('\n', cursorPosition);
+        if (currentLineEnd == std::string::npos)
+          currentLineEnd = currentText.length();
+
+        // Find next line start
+        size_t nextLineStart = (currentLineEnd == currentText.length())
+                                   ? currentText.length()
+                                   : currentLineEnd + 1;
+
+        // There is a bug when moving below when at the end of the line
+        // TODO
+        if (nextLineStart < currentText.length()) { // If not on the last line
+          size_t currentLineStart = currentText.rfind('\n', cursorPosition);
+          if (currentLineStart == std::string::npos)
+            currentLineStart = 0;
+          else
+            currentLineStart++;
+
+          size_t col =
+              cursorPosition - currentLineStart; // Column on current line
+          size_t nextLineEnd = currentText.find('\n', nextLineStart);
+          if (nextLineEnd == std::string::npos)
+            nextLineEnd = currentText.length();
+
+          cursorPosition = std::min((size_t)nextLineStart + col, nextLineEnd);
+          updateTextDisplayCursor();
+        } else {
+          cursorPosition = currentText.length(); // Already at the bottom
+          updateTextDisplayCursor();
+        }
+      }
+    }
+
+    else if (event.type == sf::Event::MouseWheelScrolled && isActive) {
       if (isMouseOver(background.getGlobalBounds(), mousePos)) {
         if (event.mouseWheelScroll.delta < 0) { // Scroll down
           scrollOffset =
@@ -222,8 +338,35 @@ public:
         } else if (event.mouseWheelScroll.delta > 0) { // Scroll up
           scrollOffset = std::max(scrollOffset - TEXT_BLOCK_LINE_HEIGHT, 0.0f);
         }
-        updateTextDisplay(); // Update text position after scroll
+        updateTextDisplayCursor(); // Update text position after scroll
       }
+    }
+  }
+
+  void draw_with_cursor(sf::RenderWindow &window) {
+    this->draw(window);
+    if (isActive) {
+      if (cursorBlinkClock.getElapsedTime().asSeconds() > CURSOR_BLINK_RATE) {
+        showCursor = !showCursor;
+        cursorBlinkClock.restart();
+      }
+      if (showCursor) {
+        window.draw(cursorShape);
+      }
+    }
+  }
+
+  void updateTextDisplayCursor() {
+    this->updateTextDisplay();
+    if (isActive) {
+      // Get the local position of the character at cursorPosition
+      // This is relative to the textDisplay's origin (0,0)
+      sf::Vector2f localCursorPos =
+          textDisplay.findCharacterPos(cursorPosition);
+
+      // Convert local position to global window position
+      // textDisplay.getPosition() is the top-left of the text block
+      cursorShape.setPosition(localCursorPos.x, localCursorPos.y);
     }
   }
 };
@@ -291,6 +434,12 @@ public:
     dropdownBackground.setFillColor(sf::Color(50, 50, 50));
     dropdownBackground.setOutlineThickness(1.0f);
     dropdownBackground.setOutlineColor(sf::Color::White);
+
+    // This is to fit the long file names
+    // Not dynamic so change if possible
+    // TODO
+    this->text.setPosition(this->shape.getPosition().x + 40.0f,
+                           this->text.getPosition().y);
   }
 
   void handleEvent(sf::Event event, const sf::Vector2f &mousePos) {

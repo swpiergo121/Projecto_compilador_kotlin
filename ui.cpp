@@ -46,13 +46,15 @@ int main() {
                                 textBlockHeight + PADDING),
       sf::Vector2f(textBlockWidth, RESULT_HEIGHT_BOX), font);
 
-  // Buttons (Left Top)
-  Button buttonLoad(sf::Vector2f(PADDING + BUTTON_WIDTH + PADDING, PADDING),
-                    sf::Vector2f(BUTTON_WIDTH, BUTTON_HEIGHT), "Load test",
-                    font);
-  Button buttonRun(
-      sf::Vector2f(PADDING + (BUTTON_WIDTH + PADDING) * 2, PADDING),
-      sf::Vector2f(BUTTON_WIDTH, BUTTON_HEIGHT), "Run", font);
+  // Buttons load
+  Button buttonLoad(
+      sf::Vector2f(PADDING + BUTTON_DROPDOWN_WIDTH + PADDING, PADDING),
+      sf::Vector2f(BUTTON_WIDTH, BUTTON_HEIGHT), "Load test", font);
+  // Buttons run
+  Button buttonRun(sf::Vector2f(PADDING + BUTTON_DROPDOWN_WIDTH + PADDING +
+                                    BUTTON_WIDTH + PADDING,
+                                PADDING),
+                   sf::Vector2f(BUTTON_WIDTH, BUTTON_HEIGHT), "Run", font);
 
   // Dropdown Button (Left Top)
   string prefix_input = "tests/";
@@ -70,17 +72,19 @@ int main() {
       paths.push_back(name);
     }
   }
+  sort(paths.begin(), paths.end());
 
-  DropdownButton dropdownButton(sf::Vector2f(PADDING, PADDING),
-                                sf::Vector2f(BUTTON_WIDTH, BUTTON_HEIGHT),
-                                "Tests...", font, paths);
+  DropdownButton dropdownButton(
+      sf::Vector2f(PADDING, PADDING),
+      sf::Vector2f(BUTTON_DROPDOWN_WIDTH, BUTTON_HEIGHT), "Tests...", font,
+      paths);
 
-  // Button (Right Bottom)
+  // Button execute
   Button buttonExecute(sf::Vector2f(PADDING + textBlockWidth + PADDING,
                                     resultAssembly.background.getPosition().y),
                        sf::Vector2f(BUTTON_WIDTH, BUTTON_HEIGHT), "Execute",
                        font);
-  // Button (Right Bottom)
+  // Button save
   Button buttonSave(
       sf::Vector2f(PADDING + textBlockWidth + PADDING + BUTTON_WIDTH + PADDING,
                    resultAssembly.background.getPosition().y),
@@ -111,23 +115,29 @@ int main() {
       if (event.type == sf::Event::MouseButtonPressed &&
           event.mouseButton.button == sf::Mouse::Left) {
         if (buttonLoad.isClicked(mousePos)) {
-          string path =
-              PREFIX_INPUT + dropdownButton.items[dropdownButton.selectedIndex];
-          ifstream infile(path);
-          if (!infile.is_open()) {
-            cout << "No se pudo abrir el archivo: " << path << endl;
-            exit(1);
-          }
+          if (dropdownButton.selectedIndex == -1) {
+            resultAssembly.setText("Pick a file before loading.");
+            resultAssembly.updateTextDisplay();
+          } else {
 
-          string input;
-          string line;
-          while (getline(infile, line)) {
-            input += line + '\n';
-          }
-          infile.close();
+            string path = PREFIX_INPUT +
+                          dropdownButton.items[dropdownButton.selectedIndex];
+            ifstream infile(path);
+            if (!infile.is_open()) {
+              cout << "No se pudo abrir el archivo: " << path << endl;
+              exit(1);
+            }
 
-          kotlinEditor.setText(input);
-          kotlinEditor.updateTextDisplay();
+            string input;
+            string line;
+            while (getline(infile, line)) {
+              input += line + '\n';
+            }
+            infile.close();
+
+            kotlinEditor.setText(input);
+            kotlinEditor.updateTextDisplayCursor();
+          }
 
           std::cout << "Button load Clicked!" << std::endl;
         }
@@ -150,8 +160,54 @@ int main() {
           std::cout << "Button run Clicked!" << std::endl;
         }
         if (buttonExecute.isClicked(mousePos)) {
-          resultAssembly.setText("Result:\n");
+          // 1. Save to file
+          string asm_path = "assets/temp.s";
+          ofstream asm_file(asm_path);
+          if (!asm_file.is_open()) {
+            resultAssembly.setText(
+                "Error: Could not open temp file for writing.");
+            resultAssembly.updateTextDisplay();
+            asm_file.close();
+            continue;
+          }
+          asm_file << assemblyCode.currentText;
+          asm_file.close();
+
+          // 2. Generate .o file
+          string obj_path = "assets/temp.o";
+          std::string assemble_cmd = "gcc -c " + asm_path + " -o " + obj_path;
+          int assemble_result = std::system(assemble_cmd.c_str());
+          if (assemble_result != 0) {
+            resultAssembly.setText("Error: Assembly failed with code.");
+            resultAssembly.updateTextDisplay();
+            continue;
+          }
+
+          // 3. Link the object file to a.out file
+          string out_path = "assets/a.out";
+          std::string link_cmd = "gcc " + obj_path + " -o " + out_path;
+          int link_result = std::system(link_cmd.c_str());
+          if (link_result != 0) {
+            resultAssembly.setText("Error: Linking failed with code " +
+                                   to_string(link_result));
+            resultAssembly.updateTextDisplay();
+            // Clean up generated files
+            std::remove(asm_path.c_str());
+            std::remove(obj_path.c_str());
+            continue;
+          }
+          // 4. Execute the executable
+          std::string captured_output = exec_and_capture("./" + out_path);
+
+          // 5. Save to result box
+          resultAssembly.setText("Result:\n" + captured_output);
           resultAssembly.updateTextDisplay();
+
+          // 6. Remove files
+          std::remove(asm_path.c_str());
+          std::remove(obj_path.c_str());
+          std::remove(out_path.c_str());
+
           std::cout << "Button execute Clicked!" << std::endl;
         }
         if (buttonSave.isClicked(mousePos)) {
@@ -170,7 +226,7 @@ int main() {
     window.clear(sf::Color(50, 50, 50)); // Dark grey background
 
     // Draw elements
-    kotlinEditor.draw(window);
+    kotlinEditor.draw_with_cursor(window);
     assemblyCode.draw(window);
     resultAssembly.draw(window);
     buttonLoad.draw(window);
