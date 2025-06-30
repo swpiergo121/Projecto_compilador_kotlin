@@ -4,10 +4,10 @@
 
 #include "environment.h"
 #include "exp.h"
+#include <sstream>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
-#include <sstream>
 
 class Program;
 class VarDecList;
@@ -138,7 +138,8 @@ class EVALVisitor : public Visitor {
   // Para saber el orden de los campos de cada clase
   // class ->
   std::unordered_map<std::string, std::vector<std::string>> classFields_;
-  std::unordered_map<std::string, std::vector<Exp*>> classFieldInits_; // nombre de clase → expresiones iniciales
+  std::unordered_map<std::string, std::vector<Exp *>>
+      classFieldInits_; // nombre de clase → expresiones iniciales
   // “Heap” de objetos: objectId -> map(campo -> valor)
   std::unordered_map<int, std::unordered_map<std::string, int>> objectHeap;
 
@@ -221,21 +222,32 @@ public:
 
 private:
   T &out_;
+  stringstream data;
+  stringstream rest;
   int stackSize_ = 0;
   int labelCount_ = 0;
   bool inGlobal_ = false;
   bool collectingStrings_ = false;
   string nombreFuncion = "";
 
+  // Needs to free the memory of lists
+
   unordered_map<string, int> memoria;
-  std::unordered_map<std::string,int> memoriaIndex_; // para los índices de los for
+  std::unordered_map<std::string, int>
+      memoriaIndex_; // para los índices de los for
   unordered_map<string, bool> memoriaGlobal;
   std::unordered_map<std::string, std::string> memoriaTypes_;
 
-  std::ostringstream out_rodata_;
-
-  std::unordered_map<std::string, std::unordered_map<std::string, int>> structLayouts_;
-  std::unordered_map<std::string,std::unordered_map<std::string,std::string>> structFieldTypes_;
+  std::unordered_map<std::string, std::unordered_map<std::string, int>>
+      structLayouts_;
+  std::unordered_map<std::string, std::unordered_map<std::string, std::string>>
+      structFieldTypes_;
+  std::unordered_map<std::string, std::unordered_map<std::string, Exp *>>
+      structFieldInits_;
+  std::unordered_map<std::string, std::vector<std::string>>
+      structFieldConstructorsOrder_;
+  std::unordered_map<std::string, std::unordered_map<std::string, int>>
+      structFieldConstructors_;
 
   std::string newLabel(const std::string &prefix);
 
@@ -245,11 +257,11 @@ private:
   std::unordered_map<std::string, int> listLength_; // varName -> n
 
   // Mapa nuevo: nombre de lista global → su ListExp*
-  unordered_map<string, ListExp*> globalInits_;
+  unordered_map<string, ListExp *> globalInits_;
 
   // Mapa para booleans
-  unordered_map<std::string,int> elemSize_;
-  unordered_set<std::string> booleanArrs_; 
+  unordered_map<std::string, int> elemSize_;
+  unordered_set<std::string> booleanArrs_;
 };
 
 #endif // VISITOR_H

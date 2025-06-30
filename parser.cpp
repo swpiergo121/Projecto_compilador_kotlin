@@ -348,8 +348,7 @@ Stm *Parser::parseStmt() {
       string member = consume(Token::ID, "Se esperaba miembro tras '.'")->text;
       consume(Token::ASSIGN, "Se esperaba '=' en asignación de campo");
       Exp *rhs = parseCExp();
-      Exp *obj = new IdentifierExp(name);
-      return new AssignStatement(new DotExp(obj, member), rhs);
+      return new AssignStatement(new DotExp(name, member), rhs);
     }
     // 2.c) foo = rhs
     else if (match(Token::ASSIGN)) {
@@ -438,7 +437,7 @@ Stm *Parser::parseStmt() {
 // --- Expresiones ---
 
 Exp *Parser::parseCExp() {
-  auto left = parseExpression();
+  Exp *left = parseExpression();
   if (match(Token::GE) || match(Token::GT) || match(Token::LT) ||
       match(Token::LE) || match(Token::EQ)) {
     auto op = previous->type == Token::GT   ? GT_OP
@@ -633,12 +632,13 @@ Exp *Parser::parseFactor() {
 
   // 5) Identificador / llamada / index / member
   else if (match(Token::ID)) {
+    Exp *expr;
     // 1) Partimos de un IdentifierExp
-    Exp *expr = new IdentifierExp(previous->text);
+    string id = previous->text;
 
     // 2) Parsing de llamada: foo(...)
     if (match(Token::PI)) {
-      auto *call = new FCallExp(static_cast<IdentifierExp *>(expr)->name);
+      auto *call = new FCallExp(id);
       if (!check(Token::PD)) {
         do {
           call->add(parseCExp());
@@ -646,20 +646,18 @@ Exp *Parser::parseFactor() {
       }
       consume(Token::PD, "Se esperaba ')' en llamada");
       expr = call;
-    }
-
-    // 3) Ahora encadenamos: [idx] o .member *tantas* veces como aparezcan
-    bool loop = true;
-    while (loop) {
+    } else {
+      // 3) Ahora encadenamos: [idx] o .member. Por limitaciones, solo se puede
+      // hacer de 1 nivel
       if (match(Token::LBRACK)) {
         Exp *idx = parseCExp();
         consume(Token::RBRACK, "Se esperaba ']' en index");
-        expr = new IndexExp(static_cast<IdentifierExp *>(expr)->name, idx);
+        expr = new IndexExp(id, idx);
       } else if (match(Token::DOT)) {
         auto member = consume(Token::ID, "Se esperaba miembro tras '.'")->text;
-        expr = new DotExp(expr, member);
+        expr = new DotExp(id, member);
       } else {
-        loop = false;
+        expr = new IdentifierExp(id);
       }
     }
 

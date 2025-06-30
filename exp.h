@@ -108,7 +108,6 @@ class IndexExp : public Exp {
 public:
   std::string name;
   Exp *index;
-  Exp *listExpr;
   IndexExp(const std::string &name, Exp *index);
   int accept(Visitor *v) override;
   ~IndexExp();
@@ -116,9 +115,9 @@ public:
 
 class DotExp : public Exp {
 public:
-  Exp *object;
+  string id;
   std::string member;
-  DotExp(Exp *object, const std::string &member);
+  DotExp(string i, const std::string &member);
   int accept(Visitor *v) override;
   ~DotExp();
 };
