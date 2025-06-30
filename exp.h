@@ -20,7 +20,17 @@ public:
   static std::string binopToChar(int op);
 };
 
-enum BinaryOp { PLUS_OP, MINUS_OP, MUL_OP, DIV_OP, LT_OP, GT_OP, LE_OP, EQ_OP };
+enum BinaryOp {
+  PLUS_OP,
+  MINUS_OP,
+  MUL_OP,
+  DIV_OP,
+  LT_OP,
+  GE_OP,
+  GT_OP,
+  LE_OP,
+  EQ_OP
+};
 
 class IFExp : public Exp {
 public:
@@ -106,9 +116,9 @@ public:
 
 class DotExp : public Exp {
 public:
-  Exp*    object;
+  Exp *object;
   std::string member;
-  DotExp(Exp* object, const std::string &member);
+  DotExp(Exp *object, const std::string &member);
   int accept(Visitor *v) override;
   ~DotExp();
 };
@@ -206,7 +216,8 @@ public:
   vector<string> names;
   string typeName;
   vector<Exp *> inits;
-  VarDec(bool isMutable_, const vector<string> &names_, const string typeNames_, vector<Exp *> &inits_);
+  VarDec(bool isMutable_, const vector<string> &names_, const string typeNames_,
+         vector<Exp *> &inits_);
   int accept(Visitor *v);
   ~VarDec();
 };

@@ -25,8 +25,8 @@ string get_before_dot(string input) {
 }
 
 int main() {
-  
-  string prefix_input  = "tests/";
+
+  string prefix_input = "tests/";
   string prefix_output = "outputs/";
   vector<string> paths;
 
@@ -39,7 +39,7 @@ int main() {
   struct dirent *entry;
   while ((entry = readdir(dp)) != nullptr) {
     string name = entry->d_name;
-    if (name.size() > 4 && name.substr(name.size()-4) == ".txt") {
+    if (name.size() > 4 && name.substr(name.size() - 4) == ".txt") {
       paths.push_back(name);
     }
   }
@@ -68,7 +68,7 @@ int main() {
     // test_scanner(&scanner_test);
     cout << "---------------------------------------------------" << endl;
     cout << "path: " << path << endl;
-    test_scanner(&scanner_test);
+    // test_scanner(&scanner_test);
     cout << "Scanner exitoso" << endl;
     cout << endl;
     cout << "Iniciando parsing:" << endl;
@@ -77,16 +77,16 @@ int main() {
       Program *program = parser.parseProgram();
       cout << "Parsing exitoso" << endl << endl;
       cout << "Iniciando Visitor:" << endl;
-      PrintVisitor printVisitor;
-      EVALVisitor evalVisitor;
-      cout << "IMPRIMIR:" << endl;
-      printVisitor.imprimir(program);
-      cout << endl;
-      cout << "EJECUTAR:" << endl;
-      evalVisitor.ejecutar(program);
-      cout << "Ejecución exitosa" << endl;
-      cout << endl;
-      cout << "Generando código assembly:" << endl;
+      // PrintVisitor printVisitor;
+      // EVALVisitor evalVisitor;
+      // cout << "IMPRIMIR:" << endl;
+      // printVisitor.imprimir(program);
+      // cout << endl;
+      // cout << "EJECUTAR:" << endl;
+      // evalVisitor.ejecutar(program);
+      // cout << "Ejecución exitosa" << endl;
+      // cout << endl;
+      // cout << "Generando código assembly:" << endl;
       ofstream outfile(prefix_output + get_before_dot(path) + ".s");
       GenCodeVisitor<ofstream> genVisitor(outfile);
       genVisitor.generate(program);

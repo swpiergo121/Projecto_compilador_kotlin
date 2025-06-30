@@ -66,6 +66,11 @@ ostream& operator<<(ostream &outs, const Token &tok) {
         case Token::DOT:outs << "TOKEN(DOT)"; break;
         case Token::DOTDOT:outs << "TOKEN(DOTDOT)"; break;
 
+        case Token::DOWNTO:outs << "TOKEN(DOWNTO)"; break;
+        case Token::STEP:outs << "TOKEN(STEP)"; break;
+
+        case Token::CLASS:outs << "TOKEN(CLASS)"; break;
+
         default:outs << "TOKEN(UNKNOWN)"; break;
     }
     return outs;

@@ -2,8 +2,8 @@
 #include "parser.h"
 #include "exp.h"
 #include "token.h"
-#include <iostream>
 #include <functional>
+#include <iostream>
 #include <stdexcept>
 
 using namespace std;
@@ -89,42 +89,43 @@ Program *Parser::parseProgram() {
 }
 
 // --- Declaraciones de variables ---
-VarDecList* Parser::parseVarDecList() {
-    auto list = new VarDecList();
-    // mientras venga 'var' o 'val'
-    while (match(Token::VAR) || match(Token::VAL)) {
-        bool isMutable = (previous->type == Token::VAR);
+VarDecList *Parser::parseVarDecList() {
+  auto list = new VarDecList();
+  // mientras venga 'var' o 'val'
+  while (match(Token::VAR) || match(Token::VAL)) {
+    bool isMutable = (previous->type == Token::VAR);
 
-        // 1) uno o varios nombres separados por ','
-        vector<string> names;
-        names.push_back(consume(Token::ID, "Se esperaba identificador")->text);
-        while (match(Token::COMA)) {
-            names.push_back(consume(Token::ID, "Se esperaba identificador")->text);
-        }
-
-        // 2) tipo opcional: ':' Type [ '<' Gen (',' Gen)* '>' ]
-        string typeName;
-        if (match(Token::COLON)) {
-            typeName = consume(Token::ID, "Se esperaba nombre de tipo")->text;
-            if (match(Token::LT)) {
-                typeName += "<" + consume(Token::ID, "Se esperaba tipo genérico")->text;
-                while (match(Token::COMA))
-                    typeName += "," + consume(Token::ID, "Se esperaba tipo genérico")->text;
-                consume(Token::GT, "Se esperaba '>' al final de tipo genérico");
-                typeName += ">";
-            }
-        }
-
-        // 3) inicializador opcional (solo al primero)
-        vector<Exp*> inits(names.size(), nullptr);
-        if (match(Token::ASSIGN)) {
-            inits[0] = parseCExp();
-        }
-
-        // 4) anotar la declaración
-        list->add(new VarDec(isMutable, names, typeName, inits));
+    // 1) uno o varios nombres separados por ','
+    vector<string> names;
+    names.push_back(consume(Token::ID, "Se esperaba identificador")->text);
+    while (match(Token::COMA)) {
+      names.push_back(consume(Token::ID, "Se esperaba identificador")->text);
     }
-    return list;
+
+    // 2) tipo opcional: ':' Type [ '<' Gen (',' Gen)* '>' ]
+    string typeName;
+    if (match(Token::COLON)) {
+      typeName = consume(Token::ID, "Se esperaba nombre de tipo")->text;
+      if (match(Token::LT)) {
+        typeName += "<" + consume(Token::ID, "Se esperaba tipo genérico")->text;
+        while (match(Token::COMA))
+          typeName +=
+              "," + consume(Token::ID, "Se esperaba tipo genérico")->text;
+        consume(Token::GT, "Se esperaba '>' al final de tipo genérico");
+        typeName += ">";
+      }
+    }
+
+    // 3) inicializador opcional (solo al primero)
+    vector<Exp *> inits(names.size(), nullptr);
+    if (match(Token::ASSIGN)) {
+      inits[0] = parseCExp();
+    }
+
+    // 4) anotar la declaración
+    list->add(new VarDec(isMutable, names, typeName, inits));
+  }
+  return list;
 }
 
 VarDec *Parser::parseVarDec() {
@@ -140,13 +141,9 @@ VarDec *Parser::parseVarDec() {
 
   // 1) Leer uno o varios nombres, separados por coma
   vector<string> names;
-  names.push_back(
-    consume(Token::ID, "Se esperaba identificador")->text
-  );
+  names.push_back(consume(Token::ID, "Se esperaba identificador")->text);
   while (match(Token::COMA)) {
-    names.push_back(
-      consume(Token::ID, "Se esperaba identificador")->text
-    );
+    names.push_back(consume(Token::ID, "Se esperaba identificador")->text);
   }
 
   // 2) Tipo opcional: si viene ':', lo consumimos; si no, inferimos
@@ -183,7 +180,7 @@ VarDec *Parser::parseVarDec() {
 ClassDecList *Parser::parseClassDecList() {
   auto list = new ClassDecList();
   // Mientras veamos la palabra “class”
-  while (match(Token::ID, "class")) {
+  while (match(Token::CLASS)) {
     list->add(parseClassDec());
   }
   return list;
@@ -200,7 +197,7 @@ FunDecList *Parser::parseFunDecList() {
 
 ClassDec *Parser::parseClassDec() {
   auto name = consume(Token::ID, "Se esperaba nombre de clase")->text;
-  std::vector<Argument>* args = new std::vector<Argument>();
+  std::vector<Argument> *args = new std::vector<Argument>();
   if (match(Token::PI)) {
     args = parseArguments();
     consume(Token::PD, "Se esperaba ')' tras argumentos de clase");
@@ -240,21 +237,20 @@ FunDec *Parser::parseFunDec() {
     retType = consume(Token::ID, "Se esperaba tipo de retorno")->text;
   }
 
-  Body* body = nullptr;
+  Body *body = nullptr;
   if (match(Token::ASSIGN)) {
-    Exp* e = parseCExp();
+    Exp *e = parseCExp();
     auto *vdl = new VarDecList();
-    auto *sl  = new StatementList();
+    auto *sl = new StatementList();
     sl->add(new ReturnStatement(e));
     body = new Body(vdl, sl);
-  }
-  else if (match(Token::LBRACE)) {
+  } else if (match(Token::LBRACE)) {
     body = parseBody();
     consume(Token::RBRACE, "Se esperaba '}' fin de cuerpo de función");
   } else {
     error("Se esperaba '=' o '{' inicio de cuerpo de función");
   }
-  
+
   return new FunDec(name, retType, *params, body);
 }
 
@@ -323,128 +319,130 @@ StatementList *Parser::parseStmtList() {
   return sl;
 }
 
-Stm* Parser::parseStmt() {
-    // -- 1) print / println (son Token::PRINT pero el texto es "print" o "println")
-    if (match(Token::PRINT)) {
-        bool isLn = (previous->text == "println");
-        consume(Token::PI,  "Se esperaba '(' tras print");
-        Exp* e = parseCExp();
-        consume(Token::PD,  "Se esperaba ')' en print");
-        return new PrintStatement(e);
-    }
-    // -- 2) asignaciones (índice, campo o simple)
-    if (check(Token::ID)) {
-        Token* saveCurrent  = current;
-        Token* savePrevious = previous;
-        string name = advance()->text;
+Stm *Parser::parseStmt() {
+  // -- 1) print / println (son Token::PRINT pero el texto es "print" o
+  // "println")
+  if (match(Token::PRINT)) {
+    bool isLn = (previous->text == "println");
+    consume(Token::PI, "Se esperaba '(' tras print");
+    Exp *e = parseCExp();
+    consume(Token::PD, "Se esperaba ')' en print");
+    return new PrintStatement(e);
+  }
+  // -- 2) asignaciones (índice, campo o simple)
+  if (check(Token::ID)) {
+    Token *saveCurrent = current;
+    Token *savePrevious = previous;
+    string name = advance()->text;
 
-        // 2.a) foo[expr] = rhs
-        if (match(Token::LBRACK)) {
-            Exp* idx = parseCExp();
-            consume(Token::RBRACK, "Se esperaba ']' en índice");
-            consume(Token::ASSIGN, "Se esperaba '=' en asignación de índice");
-            Exp* rhs = parseCExp();
-            return new AssignStatement(new IndexExp(name, idx), rhs);
-        }
-        // 2.b) foo.bar = rhs
-        else if (match(Token::DOT)) {
-            string member = consume(Token::ID, "Se esperaba miembro tras '.'")->text;
-            consume(Token::ASSIGN, "Se esperaba '=' en asignación de campo");
-            Exp* rhs = parseCExp();
-            Exp* obj = new IdentifierExp(name);
-            return new AssignStatement(new DotExp(obj, member), rhs);
-        }
-        // 2.c) foo = rhs
-        else if (match(Token::ASSIGN)) {
-            Exp* rhs = parseCExp();
-            return new AssignStatement(new IdentifierExp(name), rhs);
-        }
-        else {
-            error("Después del identificador se esperaba '=' para asignación");
-        }
+    // 2.a) foo[expr] = rhs
+    if (match(Token::LBRACK)) {
+      Exp *idx = parseCExp();
+      consume(Token::RBRACK, "Se esperaba ']' en índice");
+      consume(Token::ASSIGN, "Se esperaba '=' en asignación de índice");
+      Exp *rhs = parseCExp();
+      return new AssignStatement(new IndexExp(name, idx), rhs);
+    }
+    // 2.b) foo.bar = rhs
+    else if (match(Token::DOT)) {
+      string member = consume(Token::ID, "Se esperaba miembro tras '.'")->text;
+      consume(Token::ASSIGN, "Se esperaba '=' en asignación de campo");
+      Exp *rhs = parseCExp();
+      Exp *obj = new IdentifierExp(name);
+      return new AssignStatement(new DotExp(obj, member), rhs);
+    }
+    // 2.c) foo = rhs
+    else if (match(Token::ASSIGN)) {
+      Exp *rhs = parseCExp();
+      return new AssignStatement(new IdentifierExp(name), rhs);
+    } else {
+      error("Después del identificador se esperaba '=' para asignación");
+    }
 
-        current  = saveCurrent;
-        previous = savePrevious;
+    current = saveCurrent;
+    previous = savePrevious;
+  }
+  // -- 3) return
+  if (match(Token::RETURN)) {
+    Exp *e = parseCExp();
+    return new ReturnStatement(e);
+  }
+  // -- 4) if / while / for ...
+  if (match(Token::IF)) {
+    consume(Token::PI, "Se esperaba '(' en if");
+    Exp *cond = parseCExp();
+    consume(Token::PD, "Se esperaba ')' en if");
+    Body *thenB = nullptr;
+    if (match(Token::LBRACE)) {
+      thenB = parseBody();
+      consume(Token::RBRACE, "Se esperaba '}' fin then");
+    } else {
+      Stm *s = parseStmt();
+      auto *vdl = new VarDecList();
+      auto *sl = new StatementList();
+      sl->add(s);
+      thenB = new Body(vdl, sl);
     }
-    // -- 3) return
-    if (match(Token::RETURN)) {
-        Exp* e = parseCExp();
-        return new ReturnStatement(e);
-    }
-    // -- 4) if / while / for ...
-    if (match(Token::IF)) {
-      consume(Token::PI, "Se esperaba '(' en if");
-      Exp* cond = parseCExp();
-      consume(Token::PD, "Se esperaba ')' en if");
-      Body* thenB = nullptr;
+    Body *elseB = nullptr;
+    if (match(Token::ELSE)) {
       if (match(Token::LBRACE)) {
-        thenB = parseBody();
-        consume(Token::RBRACE, "Se esperaba '}' fin then");
+        elseB = parseBody();
+        consume(Token::RBRACE, "Se esperaba '}' fin else");
       } else {
-        Stm* s = parseStmt();
-        auto* vdl = new VarDecList();
-        auto* sl  = new StatementList();
+        Stm *s = parseStmt();
+        auto *vdl = new VarDecList();
+        auto *sl = new StatementList();
         sl->add(s);
-        thenB = new Body(vdl, sl);
+        elseB = new Body(vdl, sl);
       }
-      Body* elseB = nullptr;
-      if (match(Token::ELSE)) {
-        if (match(Token::LBRACE)) {
-          elseB = parseBody();
-          consume(Token::RBRACE, "Se esperaba '}' fin else");
-        } else {
-          Stm* s = parseStmt();
-          auto* vdl = new VarDecList();
-          auto* sl  = new StatementList();
-          sl->add(s);
-          elseB = new Body(vdl, sl);
-        }
-      }
-      return new IfStatement(cond, thenB, elseB);
     }
-    if (match(Token::WHILE)) {
-        consume(Token::PI, "Se esperaba '(' en while");
-        auto cond = parseCExp();
-        consume(Token::PD, "Se esperaba ')' tras condición");
-        consume(Token::LBRACE, "Se esperaba '{' tras while");
-        auto body = parseBody();
-        consume(Token::RBRACE, "Se esperaba '}' fin while");
-        return new WhileStatement(cond, body);
-    }
-    if (match(Token::FOR)) {
-        consume(Token::PI, "Se esperaba '(' en for");
-        string var = consume(Token::ID, "Se esperaba identificador en for")->text;
-        consume(Token::ID, "Se esperaba 'in' en for");
-        Stm* forSt = nullptr;
-        if (check(Token::NUM) || check(Token::PI)) {
-            auto loop = parseLoopExp();
-            consume(Token::PD, "Se esperaba ')' de for");
-            consume(Token::LBRACE, "Se esperaba '{' tras for");
-            auto body = parseBody();
-            consume(Token::RBRACE, "Se esperaba '}' fin for");
-            forSt = new ForStatement(var, loop, body);
-        } else {
-            auto listName = consume(Token::ID, "Se esperaba lista en for")->text;
-            consume(Token::PD, "Se esperaba ')' tras for");
-            consume(Token::LBRACE, "Se esperaba '{' tras for");
-            auto body = parseBody();
-            consume(Token::RBRACE, "Se esperaba '}' fin for");
-            forSt = new ForStatement(var, new IdentifierExp(listName), body);
-        }
-        return forSt;
-    }
+    return new IfStatement(cond, thenB, elseB);
+  }
+  if (match(Token::WHILE)) {
+    consume(Token::PI, "Se esperaba '(' en while");
+    auto cond = parseCExp();
+    consume(Token::PD, "Se esperaba ')' tras condición");
+    consume(Token::LBRACE, "Se esperaba '{' tras while");
+    auto body = parseBody();
+    consume(Token::RBRACE, "Se esperaba '}' fin while");
+    return new WhileStatement(cond, body);
+  }
+  if (match(Token::FOR)) {
+    consume(Token::PI, "Se esperaba '(' en for");
+    string var = consume(Token::ID, "Se esperaba identificador en for")->text;
+    consume(Token::ID, "Se esperaba 'in' en for");
+    Stm *forSt = nullptr;
+    if (match(Token::ID)) {
+      auto listName = previous->text;
+      consume(Token::PD, "Se esperaba ')' tras for");
+      consume(Token::LBRACE, "Se esperaba '{' tras for");
+      auto body = parseBody();
+      consume(Token::RBRACE, "Se esperaba '}' fin for");
+      forSt = new ForStatement(var, new IdentifierExp(listName), body);
 
-    error("Sentencia no reconocida");
-    return nullptr;
+    } else {
+      auto loop = parseLoopExp();
+      consume(Token::PD, "Se esperaba ')' de for");
+      consume(Token::LBRACE, "Se esperaba '{' tras for");
+      auto body = parseBody();
+      consume(Token::RBRACE, "Se esperaba '}' fin for");
+      forSt = new ForStatement(var, loop, body);
+    }
+    return forSt;
+  }
+
+  error("Sentencia no reconocida");
+  return nullptr;
 }
 
 // --- Expresiones ---
 
 Exp *Parser::parseCExp() {
   auto left = parseExpression();
-  if (match(Token::GT) || match(Token::LT) || match(Token::LE) ||
-      match(Token::EQ)) {
+  if (match(Token::GE) || match(Token::GT) || match(Token::LT) ||
+      match(Token::LE) || match(Token::EQ)) {
     auto op = previous->type == Token::GT   ? GT_OP
+              : previous->type == Token::GE ? GE_OP
               : previous->type == Token::LT ? LT_OP
               : previous->type == Token::LE ? LE_OP
                                             : EQ_OP;
@@ -488,32 +486,30 @@ Exp *Parser::parseFactor() {
 
   // 2) IntArray(size) { it -> ... }
   else if (match(Token::ID, "IntArray")) {
-    consume(Token::PI,   "Se esperaba '(' tras IntArray");
-    Exp* sizeExp = parseCExp();
-    auto *num = dynamic_cast<NumberExp*>(sizeExp);
-    if (!num) error("El primer argumento de IntArray debe ser un literal numérico");
+    consume(Token::PI, "Se esperaba '(' tras IntArray");
+    Exp *sizeExp = parseCExp();
+    auto *num = dynamic_cast<NumberExp *>(sizeExp);
+    if (!num)
+      error("El primer argumento de IntArray debe ser un literal numérico");
     int n = num->value;
-    consume(Token::PD,   "Se esperaba ')' tras tamaño de IntArray");
+    consume(Token::PD, "Se esperaba ')' tras tamaño de IntArray");
 
     consume(Token::LBRACE, "Se esperaba '{' tras IntArray(...)");
-    Exp* body = parseCExp();
+    Exp *body = parseCExp();
     consume(Token::RBRACE, "Se esperaba '}' al final de la lambda de IntArray");
 
     auto *le = new ListExp(false);
     for (int i = 0; i < n; ++i) {
-      std::function<Exp*(Exp*)> subst = [&](Exp* e)->Exp* {
-        if (auto *v = dynamic_cast<IdentifierExp*>(e)) {
-          if (v->name == "it") return new NumberExp(i);
+      std::function<Exp *(Exp *)> subst = [&](Exp *e) -> Exp * {
+        if (auto *v = dynamic_cast<IdentifierExp *>(e)) {
+          if (v->name == "it")
+            return new NumberExp(i);
           return new IdentifierExp(v->name);
         }
-        if (auto *b = dynamic_cast<BinaryExp*>(e)) {
-          return new BinaryExp(
-            subst(b->left),
-            subst(b->right),
-            b->op
-          );
+        if (auto *b = dynamic_cast<BinaryExp *>(e)) {
+          return new BinaryExp(subst(b->left), subst(b->right), b->op);
         }
-        if (auto *n2 = dynamic_cast<NumberExp*>(e)) {
+        if (auto *n2 = dynamic_cast<NumberExp *>(e)) {
           return new NumberExp(n2->value);
         }
         // Si tienes otros Exp, trátalos aquí…
@@ -526,32 +522,31 @@ Exp *Parser::parseFactor() {
 
   // 3) DoubleArray(size) { it -> ... }
   else if (match(Token::ID, "DoubleArray")) {
-    consume(Token::PI,   "Se esperaba '(' tras DoubleArray");
-    Exp* sizeExp = parseCExp();
-    auto *num = dynamic_cast<NumberExp*>(sizeExp);
-    if (!num) error("El primer argumento de DoubleArray debe ser un literal numérico");
+    consume(Token::PI, "Se esperaba '(' tras DoubleArray");
+    Exp *sizeExp = parseCExp();
+    auto *num = dynamic_cast<NumberExp *>(sizeExp);
+    if (!num)
+      error("El primer argumento de DoubleArray debe ser un literal numérico");
     int n = num->value;
-    consume(Token::PD,   "Se esperaba ')' tras tamaño de DoubleArray");
+    consume(Token::PD, "Se esperaba ')' tras tamaño de DoubleArray");
 
     consume(Token::LBRACE, "Se esperaba '{' tras DoubleArray(...)");
-    Exp* body = parseCExp();
-    consume(Token::RBRACE, "Se esperaba '}' al final de la lambda de DoubleArray");
+    Exp *body = parseCExp();
+    consume(Token::RBRACE,
+            "Se esperaba '}' al final de la lambda de DoubleArray");
 
     auto *le = new ListExp(false);
     for (int i = 0; i < n; ++i) {
-      std::function<Exp*(Exp*)> subst = [&](Exp* e)->Exp* {
-        if (auto *v = dynamic_cast<IdentifierExp*>(e)) {
-          if (v->name == "it") return new NumberExp(i);
+      std::function<Exp *(Exp *)> subst = [&](Exp *e) -> Exp * {
+        if (auto *v = dynamic_cast<IdentifierExp *>(e)) {
+          if (v->name == "it")
+            return new NumberExp(i);
           return new IdentifierExp(v->name);
         }
-        if (auto *b = dynamic_cast<BinaryExp*>(e)) {
-          return new BinaryExp(
-            subst(b->left),
-            subst(b->right),
-            b->op
-          );
+        if (auto *b = dynamic_cast<BinaryExp *>(e)) {
+          return new BinaryExp(subst(b->left), subst(b->right), b->op);
         }
-        if (auto *n2 = dynamic_cast<NumberExp*>(e)) {
+        if (auto *n2 = dynamic_cast<NumberExp *>(e)) {
           return new NumberExp(n2->value);
         }
         return nullptr;
@@ -565,39 +560,38 @@ Exp *Parser::parseFactor() {
   else if (match(Token::ID, "Array")) {
     // 1) Saltar genéricos <T>
     if (match(Token::LT)) {
-      while (!check(Token::GT) && !isAtEnd()) advance();
+      while (!check(Token::GT) && !isAtEnd())
+        advance();
       consume(Token::GT, "Se esperaba '>' tras parámetro genérico de Array");
     }
 
     // 2) Leer tamaño n
     consume(Token::PI, "Se esperaba '(' tras Array");
-    Exp* sizeExp = parseCExp();
-    auto *num = dynamic_cast<NumberExp*>(sizeExp);
-    if (!num) error("El primer argumento de Array debe ser un literal numérico");
+    Exp *sizeExp = parseCExp();
+    auto *num = dynamic_cast<NumberExp *>(sizeExp);
+    if (!num)
+      error("El primer argumento de Array debe ser un literal numérico");
     int n = num->value;
     consume(Token::PD, "Se esperaba ')' tras tamaño de Array");
 
     // 3) Leer lambda { it * ... }
     consume(Token::LBRACE, "Se esperaba '{' tras Array(...)");
-    Exp* body = parseCExp();
+    Exp *body = parseCExp();
     consume(Token::RBRACE, "Se esperaba '}' al final de la lambda de Array");
 
     // 4) Expande a ListExp con 'it' implícito
     auto *le = new ListExp(false);
     for (int i = 0; i < n; ++i) {
-      std::function<Exp*(Exp*)> subst = [&](Exp* e)->Exp* {
-        if (auto *v = dynamic_cast<IdentifierExp*>(e)) {
-          if (v->name == "it") return new NumberExp(i);
+      std::function<Exp *(Exp *)> subst = [&](Exp *e) -> Exp * {
+        if (auto *v = dynamic_cast<IdentifierExp *>(e)) {
+          if (v->name == "it")
+            return new NumberExp(i);
           return new IdentifierExp(v->name);
         }
-        if (auto *b = dynamic_cast<BinaryExp*>(e)) {
-          return new BinaryExp(
-            subst(b->left),
-            subst(b->right),
-            b->op
-          );
+        if (auto *b = dynamic_cast<BinaryExp *>(e)) {
+          return new BinaryExp(subst(b->left), subst(b->right), b->op);
         }
-        if (auto *n2 = dynamic_cast<NumberExp*>(e)) {
+        if (auto *n2 = dynamic_cast<NumberExp *>(e)) {
           return new NumberExp(n2->value);
         }
         return nullptr;
@@ -607,28 +601,31 @@ Exp *Parser::parseFactor() {
     return le;
   }
 
-  // 4) Fábricas de lista/array sin lambda: listOf, arrayOf, intArrayOf, doubleArrayOf, ...
-  // mutableListOf (mutable)
+  // 4) Fábricas de lista/array sin lambda: listOf, arrayOf, intArrayOf,
+  // doubleArrayOf, ... mutableListOf (mutable)
   else if (match(Token::ID, "mutableListOf")) {
     consume(Token::PI, "Se esperaba '(' en mutableListOf");
-    auto le = new ListExp(true);            // mutable!
+    auto le = new ListExp(true); // mutable!
     if (!check(Token::PD)) {
-      do { le->add(parseCExp()); } while (match(Token::COMA));
+      do {
+        le->add(parseCExp());
+      } while (match(Token::COMA));
     }
     consume(Token::PD, "Se esperaba ')' en mutableListOf");
     return le;
   }
   // 3) el resto de fábricas (arrays y demás)
-  else if (
-      match(Token::ID, "arrayOf")      || match(Token::ID, "intArrayOf")
-    || match(Token::ID, "longArrayOf")  || match(Token::ID, "doubleArrayOf")
-    || match(Token::ID, "booleanArrayOf") || match(Token::ID, "listOf")
-  ) {
+  else if (match(Token::ID, "arrayOf") || match(Token::ID, "intArrayOf") ||
+           match(Token::ID, "longArrayOf") ||
+           match(Token::ID, "doubleArrayOf") ||
+           match(Token::ID, "booleanArrayOf") || match(Token::ID, "listOf")) {
     std::string fn = previous->text;
     consume(Token::PI, "Se esperaba '(' en " + fn);
-    auto le = new ListExp(false);          // aquí siempre false
+    auto le = new ListExp(false); // aquí siempre false
     if (!check(Token::PD)) {
-      do { le->add(parseCExp()); } while (match(Token::COMA));
+      do {
+        le->add(parseCExp());
+      } while (match(Token::COMA));
     }
     consume(Token::PD, "Se esperaba ')' en " + fn);
     return le;
@@ -637,13 +634,15 @@ Exp *Parser::parseFactor() {
   // 5) Identificador / llamada / index / member
   else if (match(Token::ID)) {
     // 1) Partimos de un IdentifierExp
-    Exp* expr = new IdentifierExp(previous->text);
+    Exp *expr = new IdentifierExp(previous->text);
 
     // 2) Parsing de llamada: foo(...)
     if (match(Token::PI)) {
-      auto *call = new FCallExp(static_cast<IdentifierExp*>(expr)->name);
+      auto *call = new FCallExp(static_cast<IdentifierExp *>(expr)->name);
       if (!check(Token::PD)) {
-        do { call->add(parseCExp()); } while (match(Token::COMA));
+        do {
+          call->add(parseCExp());
+        } while (match(Token::COMA));
       }
       consume(Token::PD, "Se esperaba ')' en llamada");
       expr = call;
@@ -653,15 +652,13 @@ Exp *Parser::parseFactor() {
     bool loop = true;
     while (loop) {
       if (match(Token::LBRACK)) {
-        Exp* idx = parseCExp();
+        Exp *idx = parseCExp();
         consume(Token::RBRACK, "Se esperaba ']' en index");
-        expr = new IndexExp(static_cast<IdentifierExp*>(expr)->name, idx);
-      }
-      else if (match(Token::DOT)) {
+        expr = new IndexExp(static_cast<IdentifierExp *>(expr)->name, idx);
+      } else if (match(Token::DOT)) {
         auto member = consume(Token::ID, "Se esperaba miembro tras '.'")->text;
         expr = new DotExp(expr, member);
-      }
-      else {
+      } else {
         loop = false;
       }
     }
@@ -701,14 +698,16 @@ vector<Exp *> Parser::parseArgList() {
 
 LoopExp *Parser::parseLoopExp() {
   auto start = parseCExp();
-  bool downTo = match(Token::ID, "downTo");
+  bool downTo = match(Token::DOWNTO);
   if (!downTo) {
     consume(Token::DOTDOT, "Se esperaba '..' o 'downTo'");
   }
   auto end = parseCExp();
   Exp *step = nullptr;
-  if (match(Token::ID, "step")) {
+  if (match(Token::STEP)) {
     step = parseCExp();
+  } else {
+    step = new NumberExp(1);
   }
   return new LoopExp(start, end, step, downTo);
 }

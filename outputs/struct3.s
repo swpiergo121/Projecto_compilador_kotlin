@@ -30,4 +30,7 @@ main:
   leaq print_fmt(%rip), %rdi
   movl $0, %eax
   call printf@PLT
+.end_main:
+leave
+ret
 .section .note.GNU-stack,"",@progbits

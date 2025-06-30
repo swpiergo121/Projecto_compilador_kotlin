@@ -22,7 +22,9 @@ public:
         LBRACK, RBRACK,    // '[' , ']'
         COMA, PC,          // ',' , ';'
         COLON,             // ':'
-        DOT, DOTDOT        // '.' , '..'
+        DOT, DOTDOT,        // '.' , '..'
+        DOWNTO, STEP,
+        CLASS,
     };
 
     Type        type;

@@ -17,10 +17,13 @@ square:
   movq -8(%rbp), %rax
   pushq %rax
   movq -8(%rbp), %rax
-  popq %rcx
+ movq %rax, %rcx
+ popq %rax
   imulq %rcx, %rax
-  leave
-  ret
+ jmp .end_square
+.end_square:
+leave
+ret
 .globl main
 main:
   pushq %rbp
@@ -31,12 +34,13 @@ main:
   movq $2, %rax
  movq %rax,%rdi
   call square
-  addq $8, %rsp
  movq %rax,%rdi
   call square
-  addq $8, %rsp
   movq %rax, %rsi
   leaq print_fmt(%rip), %rdi
   movl $0, %eax
   call printf@PLT
+.end_main:
+leave
+ret
 .section .note.GNU-stack,"",@progbits

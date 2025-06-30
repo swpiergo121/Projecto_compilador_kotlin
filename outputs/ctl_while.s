@@ -19,10 +19,12 @@ Lwb0:
   movq -8(%rbp), %rax
   pushq %rax
   movq $3, %rax
-  popq %rcx
-  cmpq %rcx, %rax
-  setl %al
-  movzbq %al, %rax
+ movq %rax, %rcx
+ popq %rax
+ cmpq %rcx, %rax
+ movl $0, %eax
+ setle %al
+ movzbq %al, %rax
   cmpq $0, %rax
   je Lwe1
   movq -8(%rbp), %rax
@@ -33,10 +35,14 @@ Lwb0:
   movq -8(%rbp), %rax
   pushq %rax
   movq $1, %rax
-  popq %rcx
+ movq %rax, %rcx
+ popq %rax
   addq %rcx, %rax
   movq %rax, %r12
   movq %r12, -8(%rbp)
   jmp Lwb0
 Lwe1:
+.end_main:
+leave
+ret
 .section .note.GNU-stack,"",@progbits

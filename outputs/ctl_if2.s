@@ -18,10 +18,12 @@ main:
   movq -8(%rbp), %rax
   pushq %rax
   movq $3, %rax
-  popq %rcx
-  cmpq %rcx, %rax
-  setl %al
-  movzbq %al, %rax
+ movq %rax, %rcx
+ popq %rax
+ cmpq %rcx, %rax
+ movl $0, %eax
+ setle %al
+ movzbq %al, %rax
   cmpq $0, %rax
   je Lelse0
   movq $1, %rax
@@ -37,4 +39,7 @@ Lelse0:
   movl $0, %eax
   call printf@PLT
 Lend1:
+.end_main:
+leave
+ret
 .section .note.GNU-stack,"",@progbits

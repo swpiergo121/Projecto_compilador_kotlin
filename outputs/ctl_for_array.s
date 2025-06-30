@@ -43,4 +43,7 @@ Lfor0:
   movq %rax, -8(%rbp)
   jmp Lfor0
 Lend1:
+.end_main:
+leave
+ret
 .section .note.GNU-stack,"",@progbits

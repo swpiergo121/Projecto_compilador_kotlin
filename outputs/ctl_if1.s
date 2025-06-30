@@ -27,4 +27,7 @@ Lelse0:
   movl $0, %eax
   call printf@PLT
 Lend1:
+.end_main:
+leave
+ret
 .section .note.GNU-stack,"",@progbits

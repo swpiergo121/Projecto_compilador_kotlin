@@ -79,6 +79,12 @@ Token *Scanner::nextToken() {
       return new Token(Token::TRUE, word, 0, (int)word.size());
     if (word == "false")
       return new Token(Token::FALSE, word, 0, (int)word.size());
+    if (word == "downTo")
+      return new Token(Token::DOWNTO, word, 0, (int)word.size());
+    if (word == "step")
+      return new Token(Token::STEP, word, 0, (int)word.size());
+    if (word == "class")
+      return new Token(Token::CLASS, word, 0, (int)word.size());
 
     return new Token(Token::ID, word, 0, (int)word.size());
   }
