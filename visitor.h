@@ -229,6 +229,7 @@ private:
   bool inGlobal_ = false;
   bool collectingStrings_ = false;
   string nombreFuncion = "";
+  int stackFor_ = 0;
 
   // Needs to free the memory of lists
 

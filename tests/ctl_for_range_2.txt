@@ -1,0 +1,9 @@
+fun main() {
+    var z : Int = 93
+    println(z)
+    for (i in 0..2) {
+        println(i)
+    }
+    z = 33
+    println(z)
+}

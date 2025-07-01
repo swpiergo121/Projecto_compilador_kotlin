@@ -1106,8 +1106,8 @@ template <typename T> void GenCodeVisitor<T>::visit(WhileStatement *s) {
 
 template <typename T> void GenCodeVisitor<T>::visit(ForStatement *s) {
   // 1) Crear espacio para la variable de iteración
-  stackSize_ += 8;
-  memoria[s->varName] = -stackSize_;
+  stackFor_ += 8;
+  memoria[s->varName] = -stackFor_ - stackSize_;
   text << " subq $" << 8 << ", %rsp" << endl;
 
   // 2) Distinguir rango numérico o lista
@@ -1119,40 +1119,34 @@ template <typename T> void GenCodeVisitor<T>::visit(ForStatement *s) {
     // 2.1) Define the start, the end and the step to make the comparisons
     loop->start->accept(this); // -> %rax
     text << "  movq %rax, " << memoria[s->varName] << "(%rbp)\n";
-    text << "  movq %rax, %r10\n";
 
     // 2.2) Bucle con etiquetas
     auto Lfor = newLabel("for");
     auto Lend = newLabel("endfor");
     text << Lfor << ":\n";
-    // cargar i
-    text << "  movq " << memoria[s->varName] << "(%rbp), %rax\n";
-    // compare like with a binary expression with equal
-    // comparar con end.
-    text << "  pushq %rax\n";
+    // cargar end
     loop->end->accept(this); // -> %rax
     text << " movq %rax, %rcx\n ";
-    text << "  popq %rax\n";
+    // cargar i
+    text << "  movq " << memoria[s->varName] << "(%rbp), %rax\n";
 
+    // compare, code from GE case in binary
     text << "  cmpq %rcx, %rax\n"
-            "  sete %al\n"
-            "  movzbq %al, %rax\n";
-    // The 1 for it to be true
-    text << "  cmpq 1, %rax\n";
-    text << "  je " << Lend << "\n";
+         << "  movl $0, %eax\n"
+         << "  setge %al\n"
+         << "  movzbq %al, %rax\n";
+    text << "  cmpq $0, %rax\n";
+    text << "  jne " << Lend << "\n";
     // cuerpo
     s->body->accept(this);
     // i += step
 
-    text << "  movq " << memoria[s->varName] << "(%rbp), %rax\n";
-
-    text << "  pushq %rax\n";
     loop->step->accept(this);
     if (loop->downTo) {
       text << "  negq %rax\n";
     }
     text << " movq %rax, %rcx\n ";
-    text << "  popq %rax\n";
+    text << "  movq " << memoria[s->varName] << "(%rbp), %rax\n";
 
     text << "  addq %rcx, %rax\n";
     text << "  movq %rax, " << memoria[s->varName] << "(%rbp)\n";
@@ -1271,7 +1265,7 @@ template <typename T> void GenCodeVisitor<T>::visit(VarDec *d) {
     } else {
       // variables locales sin cambios
       stackSize_ += 8;
-      memoria[name] = -stackSize_;
+      memoria[name] = -stackSize_ - stackFor_;
     }
   }
 }
@@ -1398,7 +1392,7 @@ template <typename T> void GenCodeVisitor<T>::visit(Body *b) {
   // 1. Reserva para las variables
   b->vardecs->accept(this);
   if (stackSize_ > 0) {
-    text << "  subq $" << stackSize_ << ", %rsp\n\n";
+    text << "  subq $" << stackSize_ + stackFor_ << ", %rsp\n\n";
   }
 
   // 2. Inicializa las variables locales con sus valores
