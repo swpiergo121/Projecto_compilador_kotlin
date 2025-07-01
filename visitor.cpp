@@ -964,7 +964,6 @@ template <typename T> int GenCodeVisitor<T>::visit(FCallExp *e) {
          << "  pushq %rax\n";
     // 3. Unload the args, assume the args are only for the constructor,
     // so the args of call and class are equal Then go for variables
-    // TODO
     // llenar cada campo: args[i] → offset i*8
     int nFieldsConstructor = structFieldConstructorsOrder_.size();
     for (size_t i = 0; i < nFieldsConstructor; ++i) {
@@ -978,8 +977,6 @@ template <typename T> int GenCodeVisitor<T>::visit(FCallExp *e) {
       out_ << "  popq %rax\n";
       // Uses rax to access the index values
       out_ << "  movq %rcx, " << offField << "(%rax)\n";
-      // Pops the rax declared at the start of the loop
-      out_ << "  popq %rax\n";
     }
 
     // 4. Init variables
@@ -993,10 +990,10 @@ template <typename T> int GenCodeVisitor<T>::visit(FCallExp *e) {
       out_ << "  popq %rax\n";
       // Uses rax to access the index values
       out_ << "  movq %rcx, " << offField << "(%rax)\n";
-      // Pops the rax declared at the start of the loop
-      out_ << "  popq %rax\n";
     }
 
+    // Pops the rax declared at the start, which is the pointer
+    out_ << "  popq %rax\n";
     // 5. Check if there are problems with fields that start without values
     // TODO
     // 6. Dont' forget to clean!!!
@@ -1058,7 +1055,7 @@ template <typename T> void GenCodeVisitor<T>::visit(AssignStatement *s) {
     int fldOff = structLayouts_.at(structType).at(dot->member);
 
     // escribir el valor
-    out_ << "  movq " << -off << "(%rbp)" << ", %rcx\n";
+    out_ << "  movq " << off << "(%rbp)" << ", %rcx\n";
     out_ << "  movq %rax," << fldOff << " (%rcx)\n";
     return;
   }
