@@ -130,7 +130,6 @@ int PrintVisitor::visit(BoolExp *e) {
   return 0;
 }
 int PrintVisitor::visit(IdentifierExp *e) {
-  cout << "---- identifier" << endl;
   cout << e->name;
   return 0;
 }
