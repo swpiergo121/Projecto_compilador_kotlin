@@ -745,27 +745,27 @@ std::string GenCodeVisitor<T>::newLabel(const std::string &prefix) {
 template <typename T> int GenCodeVisitor<T>::visit(StringExp *e) {
   // 1) genera un label único en .rodata con el literal
   std::string lbl = newLabel("str");
-  out_ << lbl << ": .string \"" << e->value << "\"\n";
+  text << lbl << ": .string \"" << e->value << "\"\n";
   return 0;
 }
 
 template <typename T> int GenCodeVisitor<T>::visit(NumberExp *e) {
-  out_ << "  movq $" << e->value << ", %rax\n";
+  text << "  movq $" << e->value << ", %rax\n";
   return 0;
 }
 
 template <typename T> int GenCodeVisitor<T>::visit(BoolExp *e) {
-  out_ << "  movq $" << (e->value ? 1 : 0) << ", %rax\n";
+  text << "  movq $" << (e->value ? 1 : 0) << ", %rax\n";
   return 0;
 }
 
 template <typename T> int GenCodeVisitor<T>::visit(IdentifierExp *e) {
   if (memoria.count(e->name)) {
     int off = memoria.at(e->name);
-    out_ << "  movq " << off << "(%rbp), %rax\n";
+    text << "  movq " << off << "(%rbp), %rax\n";
   } else {
     // variable global
-    out_ << "  movq " << e->name << "(%rip), %rax\n";
+    text << "  movq " << e->name << "(%rip), %rax\n";
   }
   return 0;
 }
@@ -774,52 +774,52 @@ template <typename T> int GenCodeVisitor<T>::visit(BinaryExp *e) {
   // Evalúa la izquierda, deja en %rax
   e->left->accept(this);
   // Guarda %rax en la pila
-  out_ << "  pushq %rax\n";
+  text << "  pushq %rax\n";
   // Evalúa la derecha, deja en %rax
   e->right->accept(this);
   // Recupera izquierda de la pila a %rcx
-  out_ << " movq %rax, %rcx\n popq %rax\n";
+  text << " movq %rax, %rcx\n popq %rax\n";
 
   switch (e->op) {
   case PLUS_OP:
-    out_ << "  addq %rcx, %rax\n";
+    text << "  addq %rcx, %rax\n";
     break;
   case MINUS_OP:
-    out_ << "  subq %rcx, %rax\n"; // %rax = %rax - %rcx
+    text << "  subq %rcx, %rax\n"; // %rax = %rax - %rcx
     break;
   case MUL_OP:
-    out_ << "  imulq %rcx, %rax\n";
+    text << "  imulq %rcx, %rax\n";
     break;
   case DIV_OP:
-    out_ << "  cqto\n";
-    out_ << "  idivq %rcx\n"; // divide %rdx:%rax entre %rax (denominador)
+    text << "  cqto\n";
+    text << "  idivq %rcx\n"; // divide %rdx:%rax entre %rax (denominador)
     break;
   case LT_OP:
-    out_ << " cmpq %rcx, %rax\n"
+    text << " cmpq %rcx, %rax\n"
          << " movl $0, %eax\n"
          << " setl %al\n"
          << " movzbq %al, %rax\n";
     break;
   case LE_OP:
-    out_ << " cmpq %rcx, %rax\n"
+    text << " cmpq %rcx, %rax\n"
          << " movl $0, %eax\n"
          << " setle %al\n"
          << " movzbq %al, %rax\n";
     break;
   case GT_OP:
-    out_ << " cmpq %rcx, %rax\n"
+    text << " cmpq %rcx, %rax\n"
          << " movl $0, %eax\n"
          << " setg %al\n"
          << " movzbq %al, %rax\n";
     break;
   case GE_OP:
-    out_ << " cmpq %rcx, %rax\n"
+    text << " cmpq %rcx, %rax\n"
          << " movl $0, %eax\n"
          << " setge %al\n"
          << " movzbq %al, %rax\n";
     break;
   case EQ_OP:
-    out_ << "  cmpq %rcx, %rax\n"
+    text << "  cmpq %rcx, %rax\n"
             "  sete %al\n"
             "  movzbq %al, %rax\n";
     break;
@@ -836,10 +836,10 @@ template <typename T> int GenCodeVisitor<T>::visit(IndexExp *e) {
   // 2) Cargar la dirección base del array en %rbx
   if (memoria.count(e->name)) {
     int off = memoria.at(e->name);
-    out_ << "  lea " << off << "(%rbp), %rbx\n"; // &var
-    out_ << "  movq (%rbx), %rbx\n";             // ptr heap
+    text << "  lea " << off << "(%rbp), %rbx\n"; // &var
+    text << "  movq (%rbx), %rbx\n";             // ptr heap
   } else {
-    out_ << "  movq " << e->name << "(%rip), %rbx\n"; // global
+    text << "  movq " << e->name << "(%rip), %rbx\n"; // global
   }
 
   // 3) Determinar tamaño de elemento (por defecto 8)
@@ -851,16 +851,16 @@ template <typename T> int GenCodeVisitor<T>::visit(IndexExp *e) {
   // 4) Indexación distinta para booleanArrayOf (1 byte) vs resto
   if (booleanArrs_.count(e->name)) {
     // offset = idx * 1
-    out_ << "  lea    (%rbx,%rax,1), %rbx\n";
-    out_ << "  movzbq (%rbx), %rax\n";
+    text << "  lea    (%rbx,%rax,1), %rbx\n";
+    text << "  movzbq (%rbx), %rax\n";
   } else {
     if (esz == 8) {
-      out_ << "  salq $3, %rax\n";
+      text << "  salq $3, %rax\n";
     } else {
-      out_ << "  imulq  $" << esz << ", %rax" << esz << "\n";
+      text << "  imulq  $" << esz << ", %rax" << esz << "\n";
     }
-    out_ << "  addq   %rax, %rbx\n";
-    out_ << "  movq   (%rbx), %rax\n";
+    text << "  addq   %rax, %rbx\n";
+    text << "  movq   (%rbx), %rax\n";
   }
 
   return 0;
@@ -869,8 +869,8 @@ template <typename T> int GenCodeVisitor<T>::visit(IndexExp *e) {
 template <typename T> int GenCodeVisitor<T>::visit(DotExp *exp) {
   // 1) puntero al objeto anidado
   int off = memoria.at(exp->id);
-  out_ << "  movq " << off << "(%rbp), %rax\n";
-  out_ << "  movq %rax, %rbx\n";
+  text << "  movq " << off << "(%rbp), %rax\n";
+  text << "  movq %rax, %rbx\n";
 
   // 2) averiguar el tipo de ese objeto
   std::string objType = memoriaTypes_.at(exp->id);
@@ -878,11 +878,11 @@ template <typename T> int GenCodeVisitor<T>::visit(DotExp *exp) {
   // 3) sumar offset del campo en esa clase
   int fldOff = structLayouts_.at(objType).at(exp->member);
   if (fldOff != 0) {
-    out_ << "  addq $" << fldOff << ", %rbx\n";
+    text << "  addq $" << fldOff << ", %rbx\n";
   }
 
   // 4) cargar campo
-  out_ << "  movq (%rbx), %rax\n";
+  text << "  movq (%rbx), %rax\n";
   return 0;
 }
 
@@ -897,15 +897,15 @@ template <typename T> int GenCodeVisitor<T>::visit(IFExp *e) {
   auto Lend = newLabel("Lend");
   // condición
   e->cond->accept(this);
-  out_ << "  cmpq $0, %rax\n";
-  out_ << "  je " << Lelse << "\n";
+  text << "  cmpq $0, %rax\n";
+  text << "  je " << Lelse << "\n";
   // then
   e->left->accept(this);
-  out_ << "  jmp " << Lend << "\n";
-  out_ << Lelse << ":\n";
+  text << "  jmp " << Lend << "\n";
+  text << Lelse << ":\n";
   // else
   e->right->accept(this);
-  out_ << Lend << ":\n";
+  text << Lend << ":\n";
   return 0;
 }
 
@@ -928,25 +928,32 @@ template <typename T> int GenCodeVisitor<T>::visit(ListExp *e) {
 
   // A) Lista de String: malloc de punteros + llenar con labels
   if (n > 0 && dynamic_cast<StringExp *>(e->elements[0])) {
-    out_ << "  movq $" << (n * 8) << ", %rdi\n"
+    text << "  movq $" << (n * 8) << ", %rdi\n"
          << "  call malloc@PLT\n"
          << "  movq %rax, %rbx\n";
     for (size_t i = 0; i < n; ++i) {
       auto txt = static_cast<StringExp *>(e->elements[i])->value;
       auto lbl = stringLabel_[txt];
-      out_ << "  leaq " << lbl << "(%rip), %rax\n"
+      text << "  leaq " << lbl << "(%rip), %rax\n"
            << "  movq %rax, " << (i * 8) << "(%rbx)\n";
     }
-    return 0;
-  }
+  } else {
 
-  // B) Lista de Int: malloc de 8*n bytes + almacenar cada entero
-  out_ << "  movq $" << (n * 8) << ", %rdi\n"
-       << "  call malloc@PLT\n"
-       << "  movq %rax, %rbx\n";
-  for (size_t i = 0; i < n; ++i) {
-    e->elements[i]->accept(this); // → %rax = valor entero
-    out_ << "  movq %rax, " << (i * 8) << "(%rbx)\n";
+    // B) Lista de Int: malloc de 8*n bytes + almacenar cada entero
+    text << "  movq $" << (n * 8) << ", %rdi\n"
+         << "  call malloc@PLT\n"
+         << "  pushq %rax\n";
+    for (size_t i = 0; i < n; ++i) {
+      text << "  pushq %rax\n";
+      e->elements[i]->accept(this); // → %rax = valor entero
+      text << "  movq %rax, %rcx\n";
+      // Pops to have the rax pointer saved at the start
+      text << "  popq %rax\n";
+      // Uses rax to access the index values
+      text << "  movq %rcx, " << (i * 8) << "(%rax)\n";
+    }
+
+    text << "  popq %rax\n";
   }
   return 0;
 }
@@ -959,7 +966,7 @@ template <typename T> int GenCodeVisitor<T>::visit(FCallExp *e) {
     // 1. Sum number of variables and number of variables declared
     int nFields = structLayouts_[e->name].size();
     // 2. Reserver memory
-    out_ << "  movq $" << (nFields * 8) << ", %rdi\n"
+    text << "  movq $" << (nFields * 8) << ", %rdi\n"
          << "  call malloc@PLT\n"
          << "  pushq %rax\n";
     // 3. Unload the args, assume the args are only for the constructor,
@@ -969,31 +976,31 @@ template <typename T> int GenCodeVisitor<T>::visit(FCallExp *e) {
     for (size_t i = 0; i < nFieldsConstructor; ++i) {
       string fieldName = structFieldConstructorsOrder_[e->name][i];
       int offField = structLayouts_[e->name][fieldName];
-      out_ << "  pushq %rax\n";
+      text << "  pushq %rax\n";
       e->args[i]->accept(this); // → %rax = valor de arg
       // Saves result in rcx
-      out_ << "  movq %rax, %rcx\n";
+      text << "  movq %rax, %rcx\n";
       // Pops to have the rax pointer saved at the start
-      out_ << "  popq %rax\n";
+      text << "  popq %rax\n";
       // Uses rax to access the index values
-      out_ << "  movq %rcx, " << offField << "(%rax)\n";
+      text << "  movq %rcx, " << offField << "(%rax)\n";
     }
 
     // 4. Init variables
     for (auto v : structFieldInits_[e->name]) {
       int offField = structLayouts_[e->name][v.first];
-      out_ << "  pushq %rax\n";
+      text << "  pushq %rax\n";
       v.second->accept(this); // → %rax = valor de arg
       // Saves result in rcx
-      out_ << "  movq %rax, %rcx\n";
+      text << "  movq %rax, %rcx\n";
       // Pops to have the rax pointer saved at the start
-      out_ << "  popq %rax\n";
+      text << "  popq %rax\n";
       // Uses rax to access the index values
-      out_ << "  movq %rcx, " << offField << "(%rax)\n";
+      text << "  movq %rcx, " << offField << "(%rax)\n";
     }
 
     // Pops the rax declared at the start, which is the pointer
-    out_ << "  popq %rax\n";
+    text << "  popq %rax\n";
     // 5. Check if there are problems with fields that start without values
     // TODO
     // 6. Dont' forget to clean!!!
@@ -1006,11 +1013,11 @@ template <typename T> int GenCodeVisitor<T>::visit(FCallExp *e) {
                                    "%rcx", "%r8",  "%r9"};
     for (int i = 0; i < e->args.size(); i++) {
       e->args[i]->accept(this);
-      out_ << " movq %rax," << argRegs[i] << endl;
+      text << " movq %rax," << argRegs[i] << endl;
     }
 
     // 2) Llamada a función externa/usuario
-    out_ << "  call " << e->name << "\n";
+    text << "  call " << e->name << "\n";
 
     // Resultado en %rax
     return 0;
@@ -1025,25 +1032,25 @@ template <typename T> void GenCodeVisitor<T>::visit(AssignStatement *s) {
   // 2) caso var local
   if (auto id = dynamic_cast<IdentifierExp *>(s->target)) {
     int off = memoria.at(id->name);
-    out_ << "  movq %rax, " << off << "(%rbp)\n";
+    text << "  movq %rax, " << off << "(%rbp)\n";
     return;
   } else if (auto idx = dynamic_cast<IndexExp *>(s->target)) {
     // 3) caso array[index]
     // I don't know whether list inside lists work
     // TODO, test
     // push rax of expr
-    out_ << "  pushq %rax\n";
+    text << "  pushq %rax\n";
 
     int off = memoria.at(idx->name);
-    out_ << "  lea " << off << "(%rbp), %rbx\n"
+    text << "  lea " << off << "(%rbp), %rbx\n"
          << "  movq (%rbx), %rbx\n";
     idx->index->accept(this);
-    out_ << "  salq $3, %rax\n"
+    text << "  salq $3, %rax\n"
          << "  addq %rax, %rbx\n";
 
     // pop rax of expr to assign
-    out_ << "  popq %rax\n";
-    out_ << "  movq %rax, (%rbx)\n";
+    text << "  popq %rax\n";
+    text << "  movq %rax, (%rbx)\n";
     return;
   } else if (auto dot = dynamic_cast<DotExp *>(s->target)) {
     // 4) caso struct.field
@@ -1055,8 +1062,8 @@ template <typename T> void GenCodeVisitor<T>::visit(AssignStatement *s) {
     int fldOff = structLayouts_.at(structType).at(dot->member);
 
     // escribir el valor
-    out_ << "  movq " << off << "(%rbp)" << ", %rcx\n";
-    out_ << "  movq %rax," << fldOff << " (%rcx)\n";
+    text << "  movq " << off << "(%rbp)" << ", %rcx\n";
+    text << "  movq %rax," << fldOff << " (%rcx)\n";
     return;
   }
 
@@ -1066,43 +1073,43 @@ template <typename T> void GenCodeVisitor<T>::visit(AssignStatement *s) {
 
 template <typename T> void GenCodeVisitor<T>::visit(PrintStatement *s) {
   s->expr->accept(this);
-  out_ << "  movq %rax, %rsi\n";
-  out_ << "  leaq print_fmt(%rip), %rdi\n";
-  out_ << "  movl $0, %eax\n";
-  out_ << "  call printf@PLT\n";
+  text << "  movq %rax, %rsi\n";
+  text << "  leaq print_fmt(%rip), %rdi\n";
+  text << "  movl $0, %eax\n";
+  text << "  call printf@PLT\n";
 }
 
 template <typename T> void GenCodeVisitor<T>::visit(IfStatement *s) {
   auto Lelse = newLabel("Lelse");
   auto Lend = newLabel("Lend");
   s->cond->accept(this);
-  out_ << "  cmpq $0, %rax\n";
-  out_ << "  je " << Lelse << "\n";
+  text << "  cmpq $0, %rax\n";
+  text << "  je " << Lelse << "\n";
   s->thenBranch->accept(this);
-  out_ << "  jmp " << Lend << "\n";
-  out_ << Lelse << ":\n";
+  text << "  jmp " << Lend << "\n";
+  text << Lelse << ":\n";
   if (s->elseBranch)
     s->elseBranch->accept(this);
-  out_ << Lend << ":\n";
+  text << Lend << ":\n";
 }
 
 template <typename T> void GenCodeVisitor<T>::visit(WhileStatement *s) {
   auto Lbegin = newLabel("while");
   auto Lend = newLabel("endwhile");
-  out_ << Lbegin << ":\n";
+  text << Lbegin << ":\n";
   s->cond->accept(this);
-  out_ << "  cmpq $0, %rax\n";
-  out_ << "  je " << Lend << "\n";
+  text << "  cmpq $0, %rax\n";
+  text << "  je " << Lend << "\n";
   s->body->accept(this);
-  out_ << "  jmp " << Lbegin << "\n";
-  out_ << Lend << ":\n";
+  text << "  jmp " << Lbegin << "\n";
+  text << Lend << ":\n";
 }
 
 template <typename T> void GenCodeVisitor<T>::visit(ForStatement *s) {
   // 1) Crear espacio para la variable de iteración
   stackSize_ += 8;
   memoria[s->varName] = -stackSize_;
-  out_ << " subq $" << 8 << ", %rsp" << endl;
+  text << " subq $" << 8 << ", %rsp" << endl;
 
   // 2) Distinguir rango numérico o lista
   if (auto loop = dynamic_cast<LoopExp *>(s->iterable)) {
@@ -1112,62 +1119,62 @@ template <typename T> void GenCodeVisitor<T>::visit(ForStatement *s) {
 
     // 2.1) Define the start, the end and the step to make the comparisons
     loop->start->accept(this); // -> %rax
-    out_ << "  movq %rax, " << memoria[s->varName] << "(%rbp)\n";
-    out_ << "  movq %rax, %r10\n";
+    text << "  movq %rax, " << memoria[s->varName] << "(%rbp)\n";
+    text << "  movq %rax, %r10\n";
 
     // 2.2) Bucle con etiquetas
     auto Lfor = newLabel("for");
     auto Lend = newLabel("endfor");
-    out_ << Lfor << ":\n";
+    text << Lfor << ":\n";
     // cargar i
-    out_ << "  movq " << memoria[s->varName] << "(%rbp), %rax\n";
+    text << "  movq " << memoria[s->varName] << "(%rbp), %rax\n";
     // compare like with a binary expression with equal
     // comparar con end.
-    out_ << "  pushq %rax\n";
+    text << "  pushq %rax\n";
     loop->end->accept(this); // -> %rax
-    out_ << " movq %rax, %rcx\n ";
-    out_ << "  popq %rax\n";
+    text << " movq %rax, %rcx\n ";
+    text << "  popq %rax\n";
 
-    out_ << "  cmpq %rcx, %rax\n"
+    text << "  cmpq %rcx, %rax\n"
             "  sete %al\n"
             "  movzbq %al, %rax\n";
     // The 1 for it to be true
-    out_ << "  cmpq 1, %rax\n";
-    out_ << "  je " << Lend << "\n";
+    text << "  cmpq 1, %rax\n";
+    text << "  je " << Lend << "\n";
     // cuerpo
     s->body->accept(this);
     // i += step
 
-    out_ << "  movq " << memoria[s->varName] << "(%rbp), %rax\n";
+    text << "  movq " << memoria[s->varName] << "(%rbp), %rax\n";
 
-    out_ << "  pushq %rax\n";
+    text << "  pushq %rax\n";
     loop->step->accept(this);
     if (loop->downTo) {
-      out_ << "  negq %rax\n";
+      text << "  negq %rax\n";
     }
-    out_ << " movq %rax, %rcx\n ";
-    out_ << "  popq %rax\n";
+    text << " movq %rax, %rcx\n ";
+    text << "  popq %rax\n";
 
-    out_ << "  addq %rcx, %rax\n";
-    out_ << "  movq %rax, " << memoria[s->varName] << "(%rbp)\n";
-    out_ << "  jmp " << Lfor << "\n";
-    out_ << Lend << ":\n";
+    text << "  addq %rcx, %rax\n";
+    text << "  movq %rax, " << memoria[s->varName] << "(%rbp)\n";
+    text << "  jmp " << Lfor << "\n";
+    text << Lend << ":\n";
   } else {
     // Not working in general
     // TODO
     // 1) inicializar índice = 0
-    out_ << "  movq $0, " << memoriaIndex_[s->varName] << "(%rbp)\n";
+    text << "  movq $0, " << memoriaIndex_[s->varName] << "(%rbp)\n";
 
     // 2) cargar sólo UNA VEZ la dirección base del array en %r14
     auto id = static_cast<IdentifierExp *>(s->iterable);
     if (memoria.count(id->name)) {
       // array/lista local en pila
       int offList = memoria.at(id->name);
-      out_ << "  lea " << offList << "(%rbp), %rax\n" // &local
+      text << "  lea " << offList << "(%rbp), %rax\n" // &local
            << "  movq (%rax), %r14\n";                // ptr heap -> r14
     } else {
       // array global en .data
-      out_ << "  movq " << id->name << "(%rip), %r14\n";
+      text << "  movq " << id->name << "(%rip), %r14\n";
     }
 
     // 3) longitud
@@ -1178,7 +1185,7 @@ template <typename T> void GenCodeVisitor<T>::visit(ForStatement *s) {
     std::string Lend = newLabel("Lend");
 
     // 5) inicio del loop
-    out_ << Lfor
+    text << Lfor
          << ":\n"
          // cargar índice
          << "  movq " << memoriaIndex_[s->varName] << "(%rbp), %rax\n"
@@ -1199,7 +1206,7 @@ template <typename T> void GenCodeVisitor<T>::visit(ForStatement *s) {
     s->body->accept(this);
 
     // 9) incrementar índice y saltar
-    out_ << "  movq " << memoriaIndex_[s->varName] << "(%rbp), %rax\n"
+    text << "  movq " << memoriaIndex_[s->varName] << "(%rbp), %rax\n"
          << "  addq $1, %rax\n"
          << "  movq %rax, " << memoriaIndex_[s->varName] << "(%rbp)\n"
          << "  jmp " << Lfor << "\n"
@@ -1232,21 +1239,17 @@ template <typename T> void GenCodeVisitor<T>::visit(VarDec *d) {
       // Si se inicializa
       if (i < d->inits.size() && d->inits[i]) {
         if (auto *num = dynamic_cast<NumberExp *>(d->inits[i])) {
-          out_ << name << ": .quad " << num->value << "\n";
+          data << name << ": .quad " << num->value << "\n";
           continue; // skip resto (no malloc)
-        }
-        // Si es inicialización con string
-        // Ignoring strings
-        // if (auto *str = dynamic_cast<StringExp *>(d->inits[i])) {
-        //   static int strLabelCounter = 0;
-        //   std::string label = "str" + std::to_string(strLabelCounter++);
-        //   data << label << ": .string \"" << str->value << "\"\n";
-        //   out_ << name << ": .quad " << label << "\n";
-        //   continue; // skip resto
-        // }
-        // Si es una lista (ya tienes esto bien)
-
-        if (auto *le = dynamic_cast<ListExp *>(d->inits[i])) {
+        } else if (auto *str = dynamic_cast<StringExp *>(d->inits[i])) {
+          // Si es inicialización con string
+          static int strLabelCounter = 0;
+          std::string label = "str" + std::to_string(strLabelCounter++);
+          data << label << ": .string \"" << str->value << "\"\n";
+          data << name << ": .quad " << label << "\n";
+          continue; // skip resto
+        } else if (auto *le = dynamic_cast<ListExp *>(d->inits[i])) {
+          // Si es una lista (ya tienes esto bien)
           listLength_[name] = (int)le->elements.size();
           globalInits_[name] = le;
 
@@ -1261,6 +1264,9 @@ template <typename T> void GenCodeVisitor<T>::visit(VarDec *d) {
             elemSize_[name] = 1;
             booleanArrs_.insert(name);
           }
+
+          // Create global label to can be used as a pointer towards the list
+          data << name << ": .quad " << 0 << "\n";
         }
       }
     } else {
@@ -1277,10 +1283,50 @@ template <typename T> void GenCodeVisitor<T>::visit(VarDecList *l) {
 }
 
 template <typename T> void GenCodeVisitor<T>::visit(FunDec *f) {
-  out_ << ".globl " << f->name << "\n";
-  out_ << f->name << ":\n";
-  out_ << "  pushq %rbp\n";
-  out_ << "  movq %rsp, %rbp\n\n";
+  text << ".globl " << f->name << "\n";
+  text << f->name << ":\n";
+  text << "  pushq %rbp\n";
+  text << "  movq %rsp, %rbp\n\n";
+
+  // If inside, main declare list global variables
+  if (f->name == "main") {
+    for (auto &pr : memoriaGlobal) {
+      const std::string &name = pr.first;
+
+      // Solo inicializar en main si es una lista o array (es decir, está en
+      // globalInits_)
+      if (globalInits_.count(name)) {
+        int n = listLength_.at(name);     // longitud
+        auto *le = globalInits_.at(name); // ListExp*
+        int esz = elemSize_.at(name);
+
+        // 1. Reservar el heap
+        text << "  movq $" << (n * esz) << ", %rdi\n"
+             << "  call malloc@PLT\n"
+             << "  pushq %rax\n";
+        // 2. Assing initial values
+        for (size_t i = 0; i < n; ++i) {
+          text << "  pushq %rax\n";
+          le->elements[i]->accept(this); // → %rax = valor entero
+          if (esz == 1) {
+            text << "  movq %al, %rcx\n";
+          } else {
+            text << "  movq %rax, %rcx\n";
+          }
+          // Pops to have the rax pointer saved at the start
+          text << "  popq %rax\n";
+          // Uses rax to access the index values
+          text << "  movq %rcx, " << (i * 8) << "(%rax)\n";
+        }
+
+        text << "  popq %rax\n";
+
+        // 3. Guardar puntero en la etiqueta global
+        text << "  movq %rax, " << name << "(%rip)\n\n";
+      }
+    }
+  }
+
   this->nombreFuncion = f->name;
 
   memoria.clear();
@@ -1292,15 +1338,15 @@ template <typename T> void GenCodeVisitor<T>::visit(FunDec *f) {
     stackSize_ += 8;
     memoria[p.name] = -stackSize_;
     memoriaTypes_[p.name] = p.type;
-    out_ << "  movq " << argRegs[i] << ", " << memoria[p.name] << "(%rbp)\n";
+    text << "  movq " << argRegs[i] << ", " << memoria[p.name] << "(%rbp)\n";
   }
-  out_ << "\n";
+  text << "\n";
 
   f->body->accept(this);
 
-  out_ << ".end_" << f->name << ":" << endl;
-  out_ << "leave" << endl;
-  out_ << "ret" << endl;
+  text << ".end_" << f->name << ":" << endl;
+  text << "leave" << endl;
+  text << "ret" << endl;
   this->nombreFuncion = "";
 }
 
@@ -1314,7 +1360,6 @@ template <typename T> void GenCodeVisitor<T>::visit(ClassDec *dec) {
   int offset = 0;
   // Also add the arguments
   // Separate it for the constructor
-  // TODO
   for (auto arg : dec->args) {
     // 1) Graba el offset
     structLayouts_[dec->name][arg.name] = offset;
@@ -1354,7 +1399,7 @@ template <typename T> void GenCodeVisitor<T>::visit(Body *b) {
   // 1. Reserva para las variables
   b->vardecs->accept(this);
   if (stackSize_ > 0) {
-    out_ << "  subq $" << stackSize_ << ", %rsp\n\n";
+    text << "  subq $" << stackSize_ << ", %rsp\n\n";
   }
 
   // 2. Inicializa las variables locales con sus valores
@@ -1363,42 +1408,10 @@ template <typename T> void GenCodeVisitor<T>::visit(Body *b) {
       if (!d->inits[i])
         continue;
       d->inits[i]->accept(this); // calcula el valor → %rax
-      out_ << "  movq %rax, " << memoria[d->names[i]] << "(%rbp)\n";
+      text << "  movq %rax, " << memoria[d->names[i]] << "(%rbp)\n";
     }
   }
-  out_ << "\n";
-
-  // inicialización de listas globales (si es main)
-  if (this->nombreFuncion == "main") {
-    for (auto &pr : memoriaGlobal) {
-      const std::string &name = pr.first;
-
-      // Solo inicializar en main si es una lista o array (es decir, está en
-      // globalInits_)
-      if (globalInits_.count(name)) {
-        int n = listLength_.at(name);     // longitud
-        auto *le = globalInits_.at(name); // ListExp*
-        int esz = elemSize_.at(name);
-
-        // a) reservar heap
-        out_ << "  movq $" << (n * esz) << ", %rdi\n"
-             << "  call malloc@PLT\n"
-             << "  movq %rax, %rbx\n";
-
-        // b) escribir literales en el bloque
-        for (int i = 0; i < n; ++i) {
-          le->elements[i]->accept(this); // deja valor en %rax
-          if (esz == 1) {
-            out_ << "  movb %al, " << (i * esz) << "(%rbx)\n";
-          } else {
-            out_ << "  movq %rax, " << (i * esz) << "(%rbx)\n";
-          }
-        }
-        // c) guardar puntero en la etiqueta global
-        out_ << "  movq %rbx, " << name << "(%rip)\n\n";
-      }
-    }
-  }
+  text << "\n";
 
   // 3. Acepta statements
   b->stmts->accept(this);
@@ -1415,30 +1428,33 @@ template <typename T> void GenCodeVisitor<T>::visit(Program *prog) {
   collectingStrings_ = false;
 
   // — PASO 2: sección .data
-  out_ << ".data\n";
-  out_ << "print_fmt: .string \"%ld\\n\"\n\n";
+  data << ".data\n";
+  data << "print_fmt: .string \"%ld\\n\"\n\n";
 
   // 2.b) Variables globales (listas)
   inGlobal_ = true;
   prog->vardecs->accept(this);
+
   inGlobal_ = false;
 
   // 2.c) clases/globales si tuvieras más…
   prog->classDecs->accept(this);
 
   // — PASO 3: emitimos text
-  out_ << "\n.text\n\n";
+  text << "\n.text\n\n";
 
   // ahora vienen los FunDec
   prog->funDecs->accept(this);
 
-  out_ << ".section .note.GNU-stack,\"\",@progbits\n";
+  text << ".section .note.GNU-stack,\"\",@progbits\n";
+
+  out_ << data.str() << text.str();
 }
 
 template <typename T> void GenCodeVisitor<T>::visit(ReturnStatement *s) {
   if (s->expr)
     s->expr->accept(this); // valor → %rax
-  out_ << " jmp .end_" << this->nombreFuncion << endl;
+  text << " jmp .end_" << this->nombreFuncion << endl;
 }
 
 // Instation to prevent linking issues

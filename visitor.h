@@ -223,7 +223,7 @@ public:
 private:
   T &out_;
   stringstream data;
-  stringstream rest;
+  stringstream text;
   int stackSize_ = 0;
   int labelCount_ = 0;
   bool inGlobal_ = false;
