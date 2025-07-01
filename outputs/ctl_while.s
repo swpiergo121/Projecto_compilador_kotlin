@@ -15,7 +15,7 @@ main:
   movq $0, %rax
   movq %rax, -8(%rbp)
 
-Lwb0:
+while0:
   movq -8(%rbp), %rax
   pushq %rax
   movq $3, %rax
@@ -23,10 +23,13 @@ Lwb0:
  popq %rax
  cmpq %rcx, %rax
  movl $0, %eax
- setle %al
+ setl %al
  movzbq %al, %rax
   cmpq $0, %rax
-  je Lwe1
+  je endwhile1
+  subq $8, %rsp
+
+
   movq -8(%rbp), %rax
   movq %rax, %rsi
   leaq print_fmt(%rip), %rdi
@@ -38,10 +41,9 @@ Lwb0:
  movq %rax, %rcx
  popq %rax
   addq %rcx, %rax
-  movq %rax, %r12
-  movq %r12, -8(%rbp)
-  jmp Lwb0
-Lwe1:
+  movq %rax, -8(%rbp)
+  jmp while0
+endwhile1:
 .end_main:
 leave
 ret

@@ -25,6 +25,9 @@ main:
   movzbq %al, %rax
   cmpq $0, %rax
   je Lelse0
+  subq $8, %rsp
+
+
   movq $10, %rax
   movq %rax, %rsi
   leaq print_fmt(%rip), %rdi
@@ -32,6 +35,9 @@ main:
   call printf@PLT
   jmp Lend1
 Lelse0:
+  subq $8, %rsp
+
+
   movq $20, %rax
   movq %rax, %rsi
   leaq print_fmt(%rip), %rdi

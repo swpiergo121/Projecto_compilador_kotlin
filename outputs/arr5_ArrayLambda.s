@@ -10,42 +10,57 @@ main:
   movq %rsp, %rbp
 
 
+  subq $8, %rsp
 
   movq $32, %rdi
   call malloc@PLT
-  movq %rax, %rbx
+  pushq %rax
+  pushq %rax
   movq $0, %rax
   pushq %rax
   movq $3, %rax
  movq %rax, %rcx
  popq %rax
   imulq %rcx, %rax
-  movq %rax, 0(%rbx)
+  movq %rax, %rcx
+  popq %rax
+  movq %rcx, 0(%rax)
+  pushq %rax
   movq $1, %rax
   pushq %rax
   movq $3, %rax
  movq %rax, %rcx
  popq %rax
   imulq %rcx, %rax
-  movq %rax, 8(%rbx)
+  movq %rax, %rcx
+  popq %rax
+  movq %rcx, 8(%rax)
+  pushq %rax
   movq $2, %rax
   pushq %rax
   movq $3, %rax
  movq %rax, %rcx
  popq %rax
   imulq %rcx, %rax
-  movq %rax, 16(%rbx)
+  movq %rax, %rcx
+  popq %rax
+  movq %rcx, 16(%rax)
+  pushq %rax
   movq $3, %rax
   pushq %rax
   movq $3, %rax
  movq %rax, %rcx
  popq %rax
   imulq %rcx, %rax
-  movq %rax, 24(%rbx)
-  movq %rbx, arr(%rip)
+  movq %rax, %rcx
+  popq %rax
+  movq %rcx, 24(%rax)
+  popq %rax
+  movq %rax, -8(%rbp)
 
   movq $0, %rax
-  movq arr(%rip), %rbx
+  lea -8(%rbp), %rbx
+  movq (%rbx), %rbx
   salq $3, %rax
   addq   %rax, %rbx
   movq   (%rbx), %rax
@@ -54,7 +69,8 @@ main:
   movl $0, %eax
   call printf@PLT
   movq $3, %rax
-  movq arr(%rip), %rbx
+  lea -8(%rbp), %rbx
+  movq (%rbx), %rbx
   salq $3, %rax
   addq   %rax, %rbx
   movq   (%rbx), %rax

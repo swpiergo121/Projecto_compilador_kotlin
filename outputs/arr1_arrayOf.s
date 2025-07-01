@@ -10,20 +10,32 @@ main:
   movq %rsp, %rbp
 
 
+  subq $8, %rsp
 
   movq $24, %rdi
   call malloc@PLT
-  movq %rax, %rbx
+  pushq %rax
+  pushq %rax
   movq $10, %rax
-  movq %rax, 0(%rbx)
+  movq %rax, %rcx
+  popq %rax
+  movq %rcx, 0(%rax)
+  pushq %rax
   movq $20, %rax
-  movq %rax, 8(%rbx)
+  movq %rax, %rcx
+  popq %rax
+  movq %rcx, 8(%rax)
+  pushq %rax
   movq $30, %rax
-  movq %rax, 16(%rbx)
-  movq %rbx, a(%rip)
+  movq %rax, %rcx
+  popq %rax
+  movq %rcx, 16(%rax)
+  popq %rax
+  movq %rax, -8(%rbp)
 
   movq $1, %rax
-  movq a(%rip), %rbx
+  lea -8(%rbp), %rbx
+  movq (%rbx), %rbx
   salq $3, %rax
   addq   %rax, %rbx
   movq   (%rbx), %rax

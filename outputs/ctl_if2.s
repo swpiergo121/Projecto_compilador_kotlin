@@ -22,10 +22,13 @@ main:
  popq %rax
  cmpq %rcx, %rax
  movl $0, %eax
- setle %al
+ setl %al
  movzbq %al, %rax
   cmpq $0, %rax
   je Lelse0
+  subq $8, %rsp
+
+
   movq $1, %rax
   movq %rax, %rsi
   leaq print_fmt(%rip), %rdi
@@ -33,6 +36,9 @@ main:
   call printf@PLT
   jmp Lend1
 Lelse0:
+  subq $8, %rsp
+
+
   movq $2, %rax
   movq %rax, %rsi
   leaq print_fmt(%rip), %rdi

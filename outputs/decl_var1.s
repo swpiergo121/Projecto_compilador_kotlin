@@ -1,8 +1,8 @@
-  movq $5, %rax
 .data
 print_fmt: .string "%ld\n"
 
 a: .quad 5
+  movq $5, %rax
 
 .text
 

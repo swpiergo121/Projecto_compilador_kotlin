@@ -1,11 +1,9 @@
-.section .rodata
-str0: .string "hello"
-.text
-  leaq str0(%rip), %rax
 .data
 print_fmt: .string "%ld\n"
 
+str0: .string "hello"
 s: .quad str0
+str0: .string "hello"
 
 .text
 

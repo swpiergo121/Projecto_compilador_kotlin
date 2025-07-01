@@ -14,13 +14,23 @@ main:
 
   movq $8, %rdi
   call malloc@PLT
-  movq %rax, %rbx
-  movq %rbx, %rax
+  pushq %rax
+  pushq %rax
+  movq $2, %rax
+  movq %rax, %rcx
+  popq %rax
+  movq %rcx, 0(%rax)
+  popq %rax
   movq %rax, -8(%rbp)
   movq $8, %rdi
   call malloc@PLT
-  movq %rax, %rbx
-  movq %rbx, %rax
+  pushq %rax
+  pushq %rax
+  movq $2, %rax
+  movq %rax, %rcx
+  popq %rax
+  movq %rcx, 0(%rax)
+  popq %rax
   movq %rax, -16(%rbp)
 
   movq -8(%rbp), %rax

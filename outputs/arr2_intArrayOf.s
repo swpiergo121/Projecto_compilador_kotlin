@@ -1,6 +1,7 @@
 .data
 print_fmt: .string "%ld\n"
 
+ia: .quad 0
 
 .text
 
@@ -9,18 +10,28 @@ main:
   pushq %rbp
   movq %rsp, %rbp
 
-
-
   movq $24, %rdi
   call malloc@PLT
-  movq %rax, %rbx
+  pushq %rax
+  pushq %rax
   movq $5, %rax
-  movq %rax, 0(%rbx)
+  movq %rax, %rcx
+  popq %rax
+  movq %rcx, 0(%rax)
+  pushq %rax
   movq $7, %rax
-  movq %rax, 8(%rbx)
+  movq %rax, %rcx
+  popq %rax
+  movq %rcx, 8(%rax)
+  pushq %rax
   movq $9, %rax
-  movq %rax, 16(%rbx)
-  movq %rbx, ia(%rip)
+  movq %rax, %rcx
+  popq %rax
+  movq %rcx, 16(%rax)
+  popq %rax
+  movq %rax, ia(%rip)
+
+
 
   movq $0, %rax
   movq ia(%rip), %rbx

@@ -1,8 +1,8 @@
-  movq $1234567890123, %rax
 .data
 print_fmt: .string "%ld\n"
 
 b: .quad 1234567890123
+  movq $1234567890123, %rax
 
 .text
 
