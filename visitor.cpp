@@ -741,8 +741,17 @@ std::string GenCodeVisitor<T>::newLabel(const std::string &prefix) {
 
 template <typename T> int GenCodeVisitor<T>::visit(StringExp *e) {
   // 1) genera un label único en .rodata con el literal
-  std::string lbl = newLabel("str");
-  text << lbl << ": .string \"" << e->value << "\"\n";
+  std::string lbl = "";
+  if (auto find = stringLabel_.find(e->value); find != stringLabel_.end()) {
+    lbl = stringLabel_[e->value];
+  } else {
+    lbl = newLabel("str");
+    stringLabel_[e->value] = lbl;
+    data << lbl << ": .string \"" << e->value << "\"\n";
+  }
+  if (!inGlobal_) {
+    text << "  movq $" << lbl << "(%rip)" << ", %rax\n";
+  }
   return 0;
 }
 
@@ -909,20 +918,6 @@ template <typename T> int GenCodeVisitor<T>::visit(IFExp *e) {
 template <typename T> int GenCodeVisitor<T>::visit(ListExp *e) {
   size_t n = e->elements.size();
 
-  // ── PRIMERA PASADA: recolección de literales sólo de strings
-  if (collectingStrings_) {
-    if (n > 0 && dynamic_cast<StringExp *>(e->elements[0])) {
-      for (auto *el : e->elements) {
-        auto txt = static_cast<StringExp *>(el)->value;
-        if (!stringLabel_.count(txt))
-          stringLabel_[txt] = newLabel("str");
-      }
-    }
-    return 0;
-  }
-
-  // ── SEGUNDA PASADA: generación real dentro de .text
-
   // A) Lista de String: malloc de punteros + llenar con labels
   if (n > 0 && dynamic_cast<StringExp *>(e->elements[0])) {
     text << "  movq $" << (n * 8) << ", %rdi\n"
@@ -1067,7 +1062,34 @@ template <typename T> void GenCodeVisitor<T>::visit(AssignStatement *s) {
 template <typename T> void GenCodeVisitor<T>::visit(PrintStatement *s) {
   s->expr->accept(this);
   text << "  movq %rax, %rsi\n";
-  text << "  leaq print_fmt(%rip), %rdi\n";
+  cout << "Inside print" << endl;
+  if (auto stringexp = dynamic_cast<StringExp *>(s->expr)) {
+    cout << "String exp" << endl;
+    text << "  leaq print_string(%rip), %rdi\n";
+  } else if (auto idexp = dynamic_cast<IdentifierExp *>(s->expr)) {
+    cout << "Identifier exp" << endl;
+    if (memoriaTypes_[idexp->name] == "String") {
+      text << "  leaq print_string(%rip), %rdi\n";
+    } else {
+      text << "  leaq print_fmt(%rip), %rdi\n";
+    }
+  }
+  // else if (auto indexp = dynamic_cast<IndexExp *>(s->expr);
+  //            memoriaTypes_[indexp->name].substr(
+  //                memoriaTypes_[indexp->name].find('<') + 1,
+  //                memoriaTypes_[indexp->name].find('>') -
+  //                    memoriaTypes_[indexp->name].find('<') + 1) == "String")
+  //                    {
+  //   cout << "Index exp" << endl;
+  //   // TODO
+  //   // Fix and simplify logic and use logic for classes
+  //   text << "  leaq print_string(%rip), %rdi\n";
+  // }
+  else {
+    text << "  leaq print_fmt(%rip), %rdi\n";
+  }
+  cout << "Going out of print" << endl;
+
   text << "  movl $0, %eax\n";
   text << "  call printf@PLT\n";
 }
@@ -1106,7 +1128,6 @@ template <typename T> void GenCodeVisitor<T>::visit(ForStatement *s) {
 
   // 2) Distinguir rango numérico o lista
   if (auto loop = dynamic_cast<LoopExp *>(s->iterable)) {
-
     // 2.1) Define the start, the end and the step to make the comparisons
     loop->start->accept(this); // -> %rax
     text << "  movq %rax, " << memoria[s->varName] << "(%rbp)\n";
@@ -1225,9 +1246,9 @@ template <typename T> void GenCodeVisitor<T>::visit(VarDec *d) {
           continue; // skip resto (no malloc)
         } else if (auto *str = dynamic_cast<StringExp *>(d->inits[i])) {
           // Si es inicialización con string
-          static int strLabelCounter = 0;
-          std::string label = "str" + std::to_string(strLabelCounter++);
-          data << label << ": .string \"" << str->value << "\"\n";
+          str->accept(this);
+          string valString = str->value;
+          std::string label = stringLabel_[valString];
           data << name << ": .quad " << label << "\n";
           continue; // skip resto
         } else if (auto *le = dynamic_cast<ListExp *>(d->inits[i])) {
@@ -1401,19 +1422,11 @@ template <typename T> void GenCodeVisitor<T>::visit(Body *b) {
 }
 
 template <typename T> void GenCodeVisitor<T>::visit(Program *prog) {
-  // — PASO 1: sección .data
   data << ".data\n";
   data << "print_fmt: .string \"%ld\\n\"\n\n";
+  data << "print_string: .string \"%s\\n\"\n\n";
 
-  // — recolectar literales de string para listas
-  collectingStrings_ = true;
-  for (auto d : prog->vardecs->vars) {
-    for (auto *init : d->inits)
-      if (init)
-        init->accept(this);
-  }
-  collectingStrings_ = false;
-
+  // Variables
   // 2.b) Variables globales (listas)
   inGlobal_ = true;
   prog->vardecs->accept(this);

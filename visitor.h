@@ -252,7 +252,7 @@ private:
 
   std::string newLabel(const std::string &prefix);
 
-  // para strings en listOf:
+  // para strings:
   std::unordered_map<std::string, std::string> stringLabel_; // literal -> label
   // para longitudes:
   std::unordered_map<std::string, int> listLength_; // varName -> n
