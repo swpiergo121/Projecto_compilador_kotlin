@@ -77,7 +77,7 @@ int main() {
   DropdownButton dropdownButton(
       sf::Vector2f(PADDING, PADDING),
       sf::Vector2f(BUTTON_DROPDOWN_WIDTH, BUTTON_HEIGHT), "Tests...", font,
-      paths);
+      paths, MAX_DROPDOWN_VISIBLE_HEIGHT);
 
   // Button execute
   Button buttonExecute(sf::Vector2f(PADDING + textBlockWidth + PADDING,
@@ -110,7 +110,7 @@ int main() {
       kotlinEditor.handleEvent(event, mousePos);
       resultAssembly.handleEvent(event, mousePos);
       assemblyCode.handleEvent(event, mousePos);
-      dropdownButton.handleEvent(event, mousePos);
+      dropdownButton.handleEvent(event, mousePos, window);
 
       if (event.type == sf::Event::MouseButtonPressed &&
           event.mouseButton.button == sf::Mouse::Left) {

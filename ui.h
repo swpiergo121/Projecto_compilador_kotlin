@@ -1,6 +1,7 @@
 #include <SFML/Graphics.hpp>
 #include <SFML/Graphics/RenderWindow.hpp>
 #include <SFML/Window.hpp>
+#include <SFML/Window/Clipboard.hpp>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -23,6 +24,7 @@ const float RESULT_HEIGHT_BOX = 100.0f;
 const string PREFIX_INPUT = "tests/";
 const float CURSOR_WIDTH = 2.0f;
 const float CURSOR_BLINK_RATE = 0.5f; // Seconds
+const float MAX_DROPDOWN_VISIBLE_HEIGHT = 7 * BUTTON_HEIGHT;
 
 std::string exec_and_capture(const std::string &cmd) {
   std::string result = "";
@@ -55,6 +57,40 @@ string get_before_dot(string input) {
     // If no dot is found, return the original string
     return input;
   }
+}
+
+int findCharacterLocalPos(const sf::Text &text, const sf::Vector2f &localPos) {
+  const std::string &str = text.getString();
+  if (str.empty()) {
+    return 0;
+  }
+
+  // Iterate through each character to find the closest one
+  for (int i = 0; i <= str.length(); ++i) {
+    sf::Vector2f charPos = text.findCharacterPos(i);
+    // Check if the click is before or at this character's X position
+    // and within its line's Y range.
+    if (localPos.y < charPos.y + text.getCharacterSize() &&
+        // Check if on the same line
+        localPos.y >= charPos.y) {
+      if (localPos.x < charPos.x) {
+        // Clicked before this character
+        return i;
+      }
+    } else if (localPos.y < charPos.y) { // Clicked on a line above
+      // This means we've gone past the line where the click occurred
+      // Find the last character of the previous line
+      int prevLineEndIndex = i;
+      while (prevLineEndIndex > 0 &&
+             text.findCharacterPos(prevLineEndIndex - 1).y == charPos.y) {
+        prevLineEndIndex--;
+      }
+      // Return the end of the previous line
+      return prevLineEndIndex;
+    }
+  }
+  // Clicked after the last character
+  return str.length();
 }
 
 // --- Helper function to check if a point is within a rectangle ---
@@ -209,26 +245,13 @@ public:
           cursorBlinkClock.restart();
           showCursor = true;
 
-          // Set cursor position based on mouse click (approximate)
-          sf::Vector2f clickPos = mousePos;
-          // Adjust clickPos to be relative to the textDisplay's top-left
-          clickPos.x -= textDisplay.getPosition().x;
-          clickPos.y -= textDisplay.getPosition().y;
+          sf::Vector2f clickPosInTextCoords =
+              mousePos - textDisplay.getPosition();
+          clickPosInTextCoords.y += scrollOffset;
 
           // Find the character index closest to the click position
-          // This is a simplified approach and might not be pixel-perfect
-          cursorPosition = 0;
-          for (int i = 0; i < currentText.length(); ++i) {
-            sf::Vector2f charPos = textDisplay.findCharacterPos(i);
-            if (charPos.y > clickPos.y + FONT_SIZE) { // Clicked on a line below
-              break;
-            }
-            if (charPos.x < clickPos.x) {
-              cursorPosition = i + 1;
-            } else {
-              break; // Clicked before this character on the same line
-            }
-          }
+          cursorPosition =
+              findCharacterLocalPos(textDisplay, clickPosInTextCoords);
           updateTextDisplayCursor();
         }
       }
@@ -265,66 +288,100 @@ public:
         }
         updateTextDisplayCursor();
       } else if (event.key.code == sf::Keyboard::Up) {
-        // Move cursor up a line
-        // Find current line start
-        size_t currentLineStart = currentText.rfind('\n', cursorPosition);
-        if (currentLineStart == std::string::npos)
-          currentLineStart = 0;
-        else
-          currentLineStart++;
+        if (cursorPosition == 0) {
+          // Already at the very beginning of the text
+          updateTextDisplayCursor();
+          return;
+        }
+        // 1. Find the start of the current line
+        size_t currentLineStart = currentText.rfind('\n', cursorPosition - 1);
+        if (currentLineStart == std::string::npos) {
+          currentLineStart = 0; // First line
+        } else {
+          currentLineStart++; // Move past the newline character
+        }
 
-        // Find previous line start
-        size_t prevLineEnd = currentText.rfind(
-            '\n', currentLineStart > 0 ? currentLineStart - 1 : 0);
+        // 2. Calculate the "column" (offset from the start of the current line)
+        int currentColumn = cursorPosition - currentLineStart;
+
+        // 3. Find the start of the previous line
+        size_t prevLineEnd = std::string::npos;
+        if (currentLineStart > 0) {
+          prevLineEnd = currentText.rfind(
+              '\n',
+              currentLineStart - 2); // -2 to look before current line's start
+        }
         size_t prevLineStart =
             (prevLineEnd == std::string::npos) ? 0 : prevLineEnd + 1;
 
-        if (currentLineStart > 0) { // If not on the first line
-          size_t col =
-              cursorPosition - currentLineStart; // Column on current line
-          cursorPosition = std::min(
-              (size_t)prevLineStart + col,
-              prevLineEnd != std::string::npos
-                  ? prevLineEnd
-                  : prevLineStart + (currentLineStart - prevLineStart - 1));
-          updateTextDisplayCursor();
+        // 4. Determine the length of the previous line
+        size_t prevLineLength;
+        if (prevLineEnd ==
+            std::string::npos) { // If previous line is the first line
+          prevLineLength = currentLineStart - prevLineStart;
         } else {
-          cursorPosition = 0; // Already at the top
-          updateTextDisplayCursor();
+          prevLineLength =
+              (currentLineStart - 1) - prevLineStart; // -1 for the newline char
         }
+
+        // 5. Calculate the new cursor position on the previous line
+        cursorPosition =
+            prevLineStart + std::min(currentColumn, (int)prevLineLength);
+        updateTextDisplayCursor();
+
       } else if (event.key.code == sf::Keyboard::Down) {
-        // Move cursor down a line
-        // Find current line end
-        size_t currentLineEnd = currentText.find('\n', cursorPosition);
-        if (currentLineEnd == std::string::npos)
-          currentLineEnd = currentText.length();
-
-        // Find next line start
-        size_t nextLineStart = (currentLineEnd == currentText.length())
-                                   ? currentText.length()
-                                   : currentLineEnd + 1;
-
-        // There is a bug when moving below when at the end of the line
-        // TODO
-        if (nextLineStart < currentText.length()) { // If not on the last line
-          size_t currentLineStart = currentText.rfind('\n', cursorPosition);
-          if (currentLineStart == std::string::npos)
-            currentLineStart = 0;
-          else
-            currentLineStart++;
-
-          size_t col =
-              cursorPosition - currentLineStart; // Column on current line
-          size_t nextLineEnd = currentText.find('\n', nextLineStart);
-          if (nextLineEnd == std::string::npos)
-            nextLineEnd = currentText.length();
-
-          cursorPosition = std::min((size_t)nextLineStart + col, nextLineEnd);
+        if (cursorPosition == currentText.length()) {
+          // Already at the very end of the text
           updateTextDisplayCursor();
-        } else {
-          cursorPosition = currentText.length(); // Already at the bottom
-          updateTextDisplayCursor();
+          return;
         }
+
+        // 1. Find the end of the current line (or end of text if no newline)
+        size_t currentLineEnd = currentText.find('\n', cursorPosition);
+        if (currentLineEnd == std::string::npos) {
+          currentLineEnd = currentText.length();
+        }
+
+        // 2. Find the start of the current line
+        size_t currentLineStart = currentText.rfind('\n', cursorPosition - 1);
+        if (currentLineStart == std::string::npos) {
+          currentLineStart = 0;
+        } else {
+          currentLineStart++;
+        }
+
+        // 3. Calculate the "column"
+        int currentColumn = cursorPosition - currentLineStart;
+
+        // 4. Find the start of the next line
+        size_t nextLineStart = currentLineEnd + 1;
+
+        if (nextLineStart >= currentText.length()) {
+          // No next line, move to the very end of the text
+          cursorPosition = currentText.length();
+        } else {
+          // 5. Find the end of the next line
+          size_t nextLineEnd = currentText.find('\n', nextLineStart);
+          if (nextLineEnd == std::string::npos) {
+            nextLineEnd = currentText.length();
+          }
+
+          // 6. Determine the length of the next line
+          size_t nextLineLength = nextLineEnd - nextLineStart;
+
+          // 7. Calculate the new cursor position on the next line
+          cursorPosition =
+              nextLineStart + std::min(currentColumn, (int)nextLineLength);
+        }
+        updateTextDisplayCursor();
+      } else if (event.key.code == sf::Keyboard::V && event.key.control) {
+        sf::String clipboardText = sf::Clipboard::getString();
+
+        currentText.insert(cursorPosition, clipboardText.toAnsiString());
+
+        cursorPosition += clipboardText.getSize();
+
+        updateTextDisplayCursor();
       }
     }
 
