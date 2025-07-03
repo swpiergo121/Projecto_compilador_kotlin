@@ -10,17 +10,35 @@ main:
   movq %rsp, %rbp
 
 
-  subq $8, %rsp
+  subq $24, %rsp
 
   movq $8, %rdi
   call malloc@PLT
-  movq %rax, %rbx
-  movq %rbx, %rax
+  pushq %rax
+  popq %rax
   movq %rax, -8(%rbp)
+  movq $8, %rdi
+  call malloc@PLT
+  pushq %rax
+  popq %rax
+  movq %rax, -16(%rbp)
+  movq $8, %rdi
+  call malloc@PLT
+  pushq %rax
+  popq %rax
+  movq %rax, -24(%rbp)
 
+  movq $8, %rax
+  movq -8(%rbp), %rcx
+  movq %rax,0 (%rcx)
   movq -8(%rbp), %rax
+  movq -16(%rbp), %rcx
+  movq %rax,0 (%rcx)
+  movq -16(%rbp), %rax
   movq %rax, %rbx
   movq (%rbx), %rax
+  movq %rax, -24(%rbp)
+  movq -24(%rbp), %rax
   movq %rax, %rbx
   movq (%rbx), %rax
   movq %rax, %rsi

@@ -72,7 +72,7 @@ int main() {
     cout << "Scanner exitoso" << endl;
     cout << endl;
     cout << "Iniciando parsing:" << endl;
-    Parser parser(&scanner);
+    Parser parser(&scanner, true);
     try {
       Program *program = parser.parseProgram();
       cout << "Parsing exitoso" << endl << endl;

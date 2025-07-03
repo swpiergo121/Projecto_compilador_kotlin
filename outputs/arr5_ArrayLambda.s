@@ -1,6 +1,7 @@
 .data
 print_fmt: .string "%ld\n"
 
+arr: .quad 0
 
 .text
 
@@ -8,9 +9,6 @@ print_fmt: .string "%ld\n"
 main:
   pushq %rbp
   movq %rsp, %rbp
-
-
-  subq $8, %rsp
 
   movq $32, %rdi
   call malloc@PLT
@@ -56,11 +54,12 @@ main:
   popq %rax
   movq %rcx, 24(%rax)
   popq %rax
-  movq %rax, -8(%rbp)
+  movq %rax, arr(%rip)
+
+
 
   movq $0, %rax
-  lea -8(%rbp), %rbx
-  movq (%rbx), %rbx
+  movq arr(%rip), %rbx
   salq $3, %rax
   addq   %rax, %rbx
   movq   (%rbx), %rax
@@ -69,8 +68,7 @@ main:
   movl $0, %eax
   call printf@PLT
   movq $3, %rax
-  lea -8(%rbp), %rbx
-  movq (%rbx), %rbx
+  movq arr(%rip), %rbx
   salq $3, %rax
   addq   %rax, %rbx
   movq   (%rbx), %rax

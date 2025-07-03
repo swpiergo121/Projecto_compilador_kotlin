@@ -1,9 +1,8 @@
 .data
 print_fmt: .string "%ld\n"
 
-str0: .string "hello"
-s: .quad str0
-str0: .string "hello"
+b: .quad 12
+  movq $12, %rax
 
 .text
 
@@ -13,8 +12,17 @@ main:
   movq %rsp, %rbp
 
 
+  subq $8, %rsp
 
-  movq s(%rip), %rax
+  movq $17, %rax
+  movq %rax, -8(%rbp)
+
+  movq b(%rip), %rax
+  pushq %rax
+  movq -8(%rbp), %rax
+ movq %rax, %rcx
+ popq %rax
+  addq %rcx, %rax
   movq %rax, %rsi
   leaq print_fmt(%rip), %rdi
   movl $0, %eax
