@@ -10,11 +10,12 @@
 
 class Parser {
 public:
-    explicit Parser(Scanner* scanner);
+    explicit Parser(Scanner* scanner, bool e);
     Program* parse();      // inicia el análisis sintáctico
     Program* parseProgram();
 
 private:
+    bool exitError;
     Scanner* scanner;
     Token*   current;
     Token*   previous;

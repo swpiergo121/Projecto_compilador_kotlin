@@ -8,8 +8,9 @@
 
 using namespace std;
 
-Parser::Parser(Scanner *sc)
-    : scanner(sc), current(scanner->nextToken()), previous(nullptr) {
+Parser::Parser(Scanner *sc, bool e)
+    : scanner(sc), current(scanner->nextToken()), previous(nullptr),
+      exitError(e) {
   if (current->type == Token::ERR)
     throw runtime_error("Error léxico inicial: " + current->text);
 }
@@ -57,7 +58,11 @@ bool Parser::isAtEnd() const { return current->type == Token::END; }
 
 void Parser::error(const string &msg) {
   cerr << "[Line ??] Error de sintaxis: " << msg << endl;
-  exit(1);
+  if (exitError) {
+    exit(1);
+  } else {
+    throw std::runtime_error("Error en el parseo: " + msg);
+  }
 }
 
 // --- Programa principal ---
@@ -273,12 +278,7 @@ vector<Param> *Parser::parseParamDecList() {
 std::vector<Argument> *Parser::parseArguments() {
   auto args = new std::vector<Argument>();
 
-  // si no hay ningún parámetro, devolvemos lista vacía
-  if (!check(Token::ID)) {
-    return args;
-  }
-
-  do {
+  while (match(Token::VAL) || match(Token::VAR)) {
     // nombre
     auto aname = consume(Token::ID, "Se esperaba nombre de argumento")->text;
     // dos puntos y tipo
@@ -296,7 +296,7 @@ std::vector<Argument> *Parser::parseArguments() {
     }
 
     args->push_back({aname, atype});
-  } while (match(Token::COMA));
+  }
 
   return args;
 }

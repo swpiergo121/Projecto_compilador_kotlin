@@ -140,7 +140,7 @@ int main() {
         }
         if (buttonRun.isClicked(mousePos)) {
           Scanner scanner(kotlinEditor.getText().c_str());
-          Parser parser(&scanner);
+          Parser parser(&scanner, false);
           try {
             Program *program = parser.parseProgram();
             stringstream ss;
