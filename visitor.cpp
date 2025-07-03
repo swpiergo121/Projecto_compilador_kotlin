@@ -1062,12 +1062,9 @@ template <typename T> void GenCodeVisitor<T>::visit(AssignStatement *s) {
 template <typename T> void GenCodeVisitor<T>::visit(PrintStatement *s) {
   s->expr->accept(this);
   text << "  movq %rax, %rsi\n";
-  cout << "Inside print" << endl;
   if (auto stringexp = dynamic_cast<StringExp *>(s->expr)) {
-    cout << "String exp" << endl;
     text << "  leaq print_string(%rip), %rdi\n";
   } else if (auto idexp = dynamic_cast<IdentifierExp *>(s->expr)) {
-    cout << "Identifier exp" << endl;
     if (memoriaTypes_[idexp->name] == "String") {
       text << "  leaq print_string(%rip), %rdi\n";
     } else {
@@ -1088,7 +1085,6 @@ template <typename T> void GenCodeVisitor<T>::visit(PrintStatement *s) {
   else {
     text << "  leaq print_fmt(%rip), %rdi\n";
   }
-  cout << "Going out of print" << endl;
 
   text << "  movl $0, %eax\n";
   text << "  call printf@PLT\n";
