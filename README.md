@@ -20,7 +20,6 @@ Me parece que solo funciona con linux porque la ejecucción de assembly corre co
 - Because lists and class are expressions, they can be inside whenever expressions are used. This essentially creates problems with operations in between classes or lists because they aren't defined.
 - Nested index and dot expressions don't currently work.
 - Strings inside lists are assigned but can't be printed.
-- The for loop can work with a different step. It also accounts for a bigger value towards a smaller value, with downtTo, however itsn't working correctly.
 - Memory isn't cleaned.
 
 
