@@ -1,0 +1,9 @@
+val ia = intArrayOf(intArrayOf(3, 4), intArrayOf(7, 9))
+fun main() {
+    var f1 = ia[0]
+    var f2 = ia[1]
+    println(f1[0])
+    println(f1[1])
+    println(f2[0])
+    println(f2[1])
+}

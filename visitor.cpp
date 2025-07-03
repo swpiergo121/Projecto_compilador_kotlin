@@ -998,9 +998,7 @@ template <typename T> int GenCodeVisitor<T>::visit(FCallExp *e) {
 
     // Pops the rax declared at the start, which is the pointer
     text << "  popq %rax\n";
-    // 5. Check if there are problems with fields that start without values
-    // TODO
-    // 6. Dont' forget to clean!!!
+    // Dont' forget to clean!!!
     // TODO
     return 0;
   } else {
@@ -1033,8 +1031,6 @@ template <typename T> void GenCodeVisitor<T>::visit(AssignStatement *s) {
     return;
   } else if (auto idx = dynamic_cast<IndexExp *>(s->target)) {
     // 3) caso array[index]
-    // I don't know whether list inside lists work
-    // TODO, test
     // push rax of expr
     text << "  pushq %rax\n";
 
@@ -1110,9 +1106,6 @@ template <typename T> void GenCodeVisitor<T>::visit(ForStatement *s) {
 
   // 2) Distinguir rango numérico o lista
   if (auto loop = dynamic_cast<LoopExp *>(s->iterable)) {
-    // Not working correctly? Haven't tested completely with the latest
-    // modification
-    // TODO
 
     // 2.1) Define the start, the end and the step to make the comparisons
     loop->start->accept(this); // -> %rax
@@ -1151,8 +1144,6 @@ template <typename T> void GenCodeVisitor<T>::visit(ForStatement *s) {
     text << "  jmp " << Lfor << "\n";
     text << Lend << ":\n";
   } else {
-    // Not working in general
-    // TODO
     // 1) inicializar índice = 0
     text << "  movq $0, " << memoriaIndex_[s->varName] << "(%rbp)\n";
 
