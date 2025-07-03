@@ -233,28 +233,35 @@ private:
 
   // Needs to free the memory of lists
 
+  // Maps for variables
   unordered_map<string, int> memoria;
   std::unordered_map<std::string, int>
       memoriaIndex_; // para los índices de los for
   unordered_map<string, bool> memoriaGlobal;
   std::unordered_map<std::string, std::string> memoriaTypes_;
 
+  // Maps for class declarations
+  // class -> field -> offset
+  // The offset is for the location in heap
   std::unordered_map<std::string, std::unordered_map<std::string, int>>
       structLayouts_;
+  // class -> field -> type
   std::unordered_map<std::string, std::unordered_map<std::string, std::string>>
       structFieldTypes_;
+  // class -> field -> Exp*
+  // Saves the default values for the fields
   std::unordered_map<std::string, std::unordered_map<std::string, Exp *>>
       structFieldInits_;
+  // class -> arguments
+  // Saves the order for the passes arguments for the constructor
   std::unordered_map<std::string, std::vector<std::string>>
       structFieldConstructorsOrder_;
-  std::unordered_map<std::string, std::unordered_map<std::string, int>>
-      structFieldConstructors_;
 
   std::string newLabel(const std::string &prefix);
 
   // para strings:
   std::unordered_map<std::string, std::string> stringLabel_; // literal -> label
-  // para longitudes:
+  // para longitudes de listas:
   std::unordered_map<std::string, int> listLength_; // varName -> n
 
   // Mapa nuevo: nombre de lista global → su ListExp*

@@ -742,6 +742,7 @@ std::string GenCodeVisitor<T>::newLabel(const std::string &prefix) {
 template <typename T> int GenCodeVisitor<T>::visit(StringExp *e) {
   // 1) genera un label único en .rodata con el literal
   std::string lbl = "";
+  // Checks if the string is already labeled
   if (auto find = stringLabel_.find(e->value); find != stringLabel_.end()) {
     lbl = stringLabel_[e->value];
   } else {
@@ -749,6 +750,7 @@ template <typename T> int GenCodeVisitor<T>::visit(StringExp *e) {
     stringLabel_[e->value] = lbl;
     data << lbl << ": .string \"" << e->value << "\"\n";
   }
+  // If not in global, needs to return the value to rax
   if (!inGlobal_) {
     text << "  movq $" << lbl << "(%rip)" << ", %rax\n";
   }
@@ -767,6 +769,7 @@ template <typename T> int GenCodeVisitor<T>::visit(BoolExp *e) {
 
 template <typename T> int GenCodeVisitor<T>::visit(IdentifierExp *e) {
   if (memoria.count(e->name)) {
+    // local variable, so search in memory
     int off = memoria.at(e->name);
     text << "  movq " << off << "(%rbp), %rax\n";
   } else {
@@ -924,6 +927,10 @@ template <typename T> int GenCodeVisitor<T>::visit(ListExp *e) {
          << "  call malloc@PLT\n"
          << "  movq %rax, %rbx\n";
     for (size_t i = 0; i < n; ++i) {
+      // Assumes the string is already created
+      // Can't tell whether it works, because there are problems with printing
+      // strings from lists
+      // TODO
       auto txt = static_cast<StringExp *>(e->elements[i])->value;
       auto lbl = stringLabel_[txt];
       text << "  leaq " << lbl << "(%rip), %rax\n"
@@ -933,9 +940,9 @@ template <typename T> int GenCodeVisitor<T>::visit(ListExp *e) {
 
     // B) Lista de Int: malloc de 8*n bytes + almacenar cada entero
     text << "  movq $" << (n * 8) << ", %rdi\n"
-         << "  call malloc@PLT\n"
-         << "  pushq %rax\n";
+         << "  call malloc@PLT\n";
     for (size_t i = 0; i < n; ++i) {
+      // Saves the pointer towards the space allocated with malloc
       text << "  pushq %rax\n";
       e->elements[i]->accept(this); // → %rax = valor entero
       text << "  movq %rax, %rcx\n";
@@ -944,8 +951,6 @@ template <typename T> int GenCodeVisitor<T>::visit(ListExp *e) {
       // Uses rax to access the index values
       text << "  movq %rcx, " << (i * 8) << "(%rax)\n";
     }
-
-    text << "  popq %rax\n";
   }
   return 0;
 }
@@ -959,15 +964,15 @@ template <typename T> int GenCodeVisitor<T>::visit(FCallExp *e) {
     int nFields = structLayouts_[e->name].size();
     // 2. Reserver memory
     text << "  movq $" << (nFields * 8) << ", %rdi\n"
-         << "  call malloc@PLT\n"
-         << "  pushq %rax\n";
+         << "  call malloc@PLT\n";
     // 3. Unload the args, assume the args are only for the constructor,
     // so the args of call and class are equal Then go for variables
-    // llenar cada campo: args[i] → offset i*8
+    // Fill every field in order: args[i] → offset i*8
     int nFieldsConstructor = structFieldConstructorsOrder_[e->name].size();
     for (size_t i = 0; i < nFieldsConstructor; ++i) {
       string fieldName = structFieldConstructorsOrder_[e->name][i];
       int offField = structLayouts_[e->name][fieldName];
+      // Saves the pointer towards the memory reserved
       text << "  pushq %rax\n";
       e->args[i]->accept(this); // → %rax = valor de arg
       // Saves result in rcx
@@ -981,6 +986,7 @@ template <typename T> int GenCodeVisitor<T>::visit(FCallExp *e) {
     // 4. Init variables
     for (auto v : structFieldInits_[e->name]) {
       int offField = structLayouts_[e->name][v.first];
+      // Saves the pointer towards the memory reserved
       text << "  pushq %rax\n";
       v.second->accept(this); // → %rax = valor de arg
       // Saves result in rcx
@@ -991,8 +997,6 @@ template <typename T> int GenCodeVisitor<T>::visit(FCallExp *e) {
       text << "  movq %rcx, " << offField << "(%rax)\n";
     }
 
-    // Pops the rax declared at the start, which is the pointer
-    text << "  popq %rax\n";
     // Dont' forget to clean!!!
     // TODO
     return 0;
@@ -1030,9 +1034,12 @@ template <typename T> void GenCodeVisitor<T>::visit(AssignStatement *s) {
     text << "  pushq %rax\n";
 
     int off = memoria.at(idx->name);
+    // Obtains the address. It's kind of dealing with pointers
     text << "  lea " << off << "(%rbp), %rbx\n"
          << "  movq (%rbx), %rbx\n";
     idx->index->accept(this);
+    // Shifts the bits of rax by 3 positions
+    // This is to move the index the correct number of positions
     text << "  salq $3, %rax\n"
          << "  addq %rax, %rbx\n";
 
@@ -1062,6 +1069,9 @@ template <typename T> void GenCodeVisitor<T>::visit(AssignStatement *s) {
 template <typename T> void GenCodeVisitor<T>::visit(PrintStatement *s) {
   s->expr->accept(this);
   text << "  movq %rax, %rsi\n";
+  // Needs to determinate which print use: print_string or print_fmt
+  // This depends on the output
+  // Needs to simplify the logic
   if (auto stringexp = dynamic_cast<StringExp *>(s->expr)) {
     text << "  leaq print_string(%rip), %rdi\n";
   } else if (auto idexp = dynamic_cast<IdentifierExp *>(s->expr)) {
@@ -1093,11 +1103,14 @@ template <typename T> void GenCodeVisitor<T>::visit(PrintStatement *s) {
 template <typename T> void GenCodeVisitor<T>::visit(IfStatement *s) {
   auto Lelse = newLabel("Lelse");
   auto Lend = newLabel("Lend");
+  // if
   s->cond->accept(this);
   text << "  cmpq $0, %rax\n";
   text << "  je " << Lelse << "\n";
+  // then
   s->thenBranch->accept(this);
   text << "  jmp " << Lend << "\n";
+  // else
   text << Lelse << ":\n";
   if (s->elseBranch)
     s->elseBranch->accept(this);
@@ -1150,9 +1163,12 @@ template <typename T> void GenCodeVisitor<T>::visit(ForStatement *s) {
     // i += step
 
     loop->step->accept(this);
+    // This isn't working correctly
+    // TODO
     if (loop->downTo) {
       text << "  negq %rax\n";
     }
+    // update start with step
     text << " movq %rax, %rcx\n ";
     text << "  movq " << memoria[s->varName] << "(%rbp), %rax\n";
 
@@ -1228,6 +1244,7 @@ template <typename T> void GenCodeVisitor<T>::visit(VarDec *d) {
       }
     }
 
+    // If in global, needs to declare the quad in data to can be used anywhere
     if (inGlobal_) {
       // 2) Marcar la variable como global
       memoriaGlobal[name] = true;
@@ -1287,8 +1304,10 @@ template <typename T> void GenCodeVisitor<T>::visit(FunDec *f) {
   text << "  pushq %rbp\n";
   text << "  movq %rsp, %rbp\n\n";
 
+  this->nombreFuncion = f->name;
+
   // If inside, main declare list global variables
-  if (f->name == "main") {
+  if (nombreFuncion == "main") {
     for (auto &pr : memoriaGlobal) {
       const std::string &name = pr.first;
 
@@ -1326,8 +1345,6 @@ template <typename T> void GenCodeVisitor<T>::visit(FunDec *f) {
     }
   }
 
-  this->nombreFuncion = f->name;
-
   memoria.clear();
   stackSize_ = 0;
 
@@ -1346,6 +1363,7 @@ template <typename T> void GenCodeVisitor<T>::visit(FunDec *f) {
   text << ".end_" << f->name << ":" << endl;
   text << "leave" << endl;
   text << "ret" << endl;
+
   this->nombreFuncion = "";
 }
 
