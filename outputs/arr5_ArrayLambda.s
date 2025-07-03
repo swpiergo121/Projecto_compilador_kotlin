@@ -1,6 +1,8 @@
 .data
 print_fmt: .string "%ld\n"
 
+print_string: .string "%s\n"
+
 arr: .quad 0
 
 .text

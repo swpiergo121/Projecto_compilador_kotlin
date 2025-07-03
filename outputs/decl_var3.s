@@ -1,8 +1,9 @@
 .data
 print_fmt: .string "%ld\n"
 
+print_string: .string "%s\n"
+
 b: .quad 12
-  movq $12, %rax
 
 .text
 

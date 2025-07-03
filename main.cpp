@@ -78,15 +78,15 @@ int main() {
       cout << "Parsing exitoso" << endl << endl;
       cout << "Iniciando Visitor:" << endl;
       // PrintVisitor printVisitor;
-      // EVALVisitor evalVisitor;
       // cout << "IMPRIMIR:" << endl;
       // printVisitor.imprimir(program);
       // cout << endl;
+      // EVALVisitor evalVisitor;
       // cout << "EJECUTAR:" << endl;
       // evalVisitor.ejecutar(program);
       // cout << "Ejecución exitosa" << endl;
       // cout << endl;
-      // cout << "Generando código assembly:" << endl;
+      cout << "Generando código assembly:" << endl;
       ofstream outfile(prefix_output + get_before_dot(path) + ".s");
       GenCodeVisitor<ofstream> genVisitor(outfile);
       genVisitor.generate(program);

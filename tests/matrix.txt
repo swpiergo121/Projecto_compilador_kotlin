@@ -1,0 +1,11 @@
+val matrix = intArrayOf(intArrayOf(2, 3, 4), intArrayOf(7, 8, 9))
+
+fun main() {
+    for (i in 0..2) {
+        var temp = matrix[i]
+        println(i)
+        for (j in 0..3) {
+            println(temp[j])
+        }
+    }
+}
