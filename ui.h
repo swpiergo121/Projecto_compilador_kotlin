@@ -480,12 +480,17 @@ public:
   bool isOpen;
   int selectedIndex;
   sf::RectangleShape dropdownBackground;
+  sf::View dropdownView;   // View for scrolling
+  float scrollOffset;      // Current scroll offset
+  float maxDropdownHeight; // Maximum height for the dropdown
 
   DropdownButton(sf::Vector2f position, sf::Vector2f size,
                  const std::string &label, sf::Font &font,
-                 const std::vector<std::string> &dropdownItems)
+                 const std::vector<std::string> &dropdownItems,
+                 float maxVisibleHeight)
       : Button(position, size, label, font), items(dropdownItems),
-        isOpen(false), selectedIndex(-1) {
+        isOpen(false), selectedIndex(-1), scrollOffset(0.0f),
+        maxDropdownHeight(maxVisibleHeight) {
     dropdownBackground.setFillColor(sf::Color(50, 50, 50));
     dropdownBackground.setOutlineThickness(1.0f);
     dropdownBackground.setOutlineColor(sf::Color::White);
@@ -497,25 +502,49 @@ public:
                            this->text.getPosition().y);
   }
 
-  void handleEvent(sf::Event event, const sf::Vector2f &mousePos) {
+  void handleEvent(sf::Event event, const sf::Vector2f &mousePos,
+                   sf::RenderWindow &window) {
     if (event.type == sf::Event::MouseButtonPressed &&
         event.mouseButton.button == sf::Mouse::Left) {
       if (isMouseOver(shape.getGlobalBounds(), mousePos)) {
         isOpen = !isOpen;
+        if (isOpen) {
+          scrollOffset = 0.0f; // Reset scroll when opening
+        }
       } else if (isOpen) {
-        // Check if an item was clicked
+        // Convert mouse position to dropdown view coordinates
+        sf::Vector2f dropdownMousePos =
+            window.mapPixelToCoords(sf::Vector2i(mousePos), dropdownView);
+
+        // Check if an item was clicked within the dropdown view
         for (size_t i = 0; i < items.size(); ++i) {
-          sf::FloatRect itemRect(shape.getPosition().x,
-                                 shape.getPosition().y + shape.getSize().y +
-                                     (i * DROPDOWN_ITEM_HEIGHT),
-                                 shape.getSize().x, DROPDOWN_ITEM_HEIGHT);
-          if (isMouseOver(itemRect, mousePos)) {
+          sf::FloatRect itemRect(
+              0,                        // Relative X position within the view
+              i * DROPDOWN_ITEM_HEIGHT, // Relative Y position within the view
+              shape.getSize().x, DROPDOWN_ITEM_HEIGHT);
+          if (isMouseOver(itemRect, dropdownMousePos)) {
             selectedIndex = i;
             text.setString(
                 items[selectedIndex]); // Update button text to selected item
             isOpen = false;            // Close dropdown after selection
             break;
           }
+        }
+      }
+    } else if (event.type == sf::Event::MouseWheelScrolled) {
+      if (isOpen &&
+          isMouseOver(dropdownBackground.getGlobalBounds(), mousePos)) {
+        // Adjust scroll offset based on mouse wheel delta
+        scrollOffset += event.mouseWheelScroll.delta * DROPDOWN_ITEM_HEIGHT;
+
+        // Clamp scroll offset to prevent scrolling too far
+        float totalDropdownContentHeight = items.size() * DROPDOWN_ITEM_HEIGHT;
+        if (totalDropdownContentHeight > maxDropdownHeight) {
+          scrollOffset = std::max(
+              scrollOffset, -(totalDropdownContentHeight - maxDropdownHeight));
+          scrollOffset = std::min(scrollOffset, 0.0f);
+        } else {
+          scrollOffset = 0.0f; // No scrolling needed if content fits
         }
       }
     }
@@ -525,24 +554,43 @@ public:
     Button::draw(window); // Draw the main button
 
     if (isOpen) {
+      // Set up the dropdown background
       dropdownBackground.setPosition(shape.getPosition().x,
                                      shape.getPosition().y + shape.getSize().y);
       dropdownBackground.setSize(
-          sf::Vector2f(shape.getSize().x, items.size() * DROPDOWN_ITEM_HEIGHT));
+          sf::Vector2f(shape.getSize().x,
+                       std::min(maxDropdownHeight,
+                                (float)items.size() * DROPDOWN_ITEM_HEIGHT)));
       window.draw(dropdownBackground);
 
+      // Set up the view for the dropdown content
+      dropdownView.setViewport(
+          sf::FloatRect(dropdownBackground.getPosition().x / window.getSize().x,
+                        dropdownBackground.getPosition().y / window.getSize().y,
+                        dropdownBackground.getSize().x / window.getSize().x,
+                        dropdownBackground.getSize().y / window.getSize().y));
+      dropdownView.setSize(dropdownBackground.getSize());
+      dropdownView.setCenter(dropdownBackground.getSize().x / 2.0f,
+                             dropdownBackground.getSize().y / 2.0f -
+                                 scrollOffset);
+
+      window.setView(dropdownView);
+
+      // Draw dropdown items within the view
       for (size_t i = 0; i < items.size(); ++i) {
         sf::Text itemText;
         itemText.setFont(*text.getFont());
         itemText.setString(items[i]);
         itemText.setCharacterSize(FONT_SIZE);
         itemText.setFillColor(sf::Color::White);
-        itemText.setPosition(shape.getPosition().x + 5,
-                             shape.getPosition().y + shape.getSize().y +
-                                 (i * DROPDOWN_ITEM_HEIGHT) +
-                                 (DROPDOWN_ITEM_HEIGHT - FONT_SIZE) / 2);
+        itemText.setPosition(5, // Relative X position within the view
+                             i * DROPDOWN_ITEM_HEIGHT +
+                                 (DROPDOWN_ITEM_HEIGHT - FONT_SIZE) /
+                                     2); // Relative Y position
         window.draw(itemText);
       }
+
+      window.setView(window.getDefaultView()); // Reset to default view
     }
   }
 };
