@@ -96,10 +96,8 @@ void PrintVisitor::imprimir(Program *p) {
 }
 
 int PrintVisitor::visit(BinaryExp *e) {
-  cout << "---- left: " << endl;
   e->left->accept(this);
   cout << " " << Exp::binopToChar(e->op) << " ";
-  cout << "---- right: " << endl;
   e->right->accept(this);
   return 0;
 }
@@ -971,7 +969,7 @@ template <typename T> int GenCodeVisitor<T>::visit(FCallExp *e) {
     // 3. Unload the args, assume the args are only for the constructor,
     // so the args of call and class are equal Then go for variables
     // llenar cada campo: args[i] → offset i*8
-    int nFieldsConstructor = structFieldConstructorsOrder_.size();
+    int nFieldsConstructor = structFieldConstructorsOrder_[e->name].size();
     for (size_t i = 0; i < nFieldsConstructor; ++i) {
       string fieldName = structFieldConstructorsOrder_[e->name][i];
       int offField = structLayouts_[e->name][fieldName];
@@ -1358,6 +1356,7 @@ template <typename T> void GenCodeVisitor<T>::visit(ClassDec *dec) {
     structLayouts_[dec->name][arg.name] = offset;
     // 2) Graba el tipo del campo
     structFieldTypes_[dec->name][arg.name] = arg.type;
+    structFieldConstructorsOrder_[dec->name].push_back(arg.name);
     // 3) Siguiente campo a +8 bytes
     offset += 8;
   }
@@ -1411,7 +1410,11 @@ template <typename T> void GenCodeVisitor<T>::visit(Body *b) {
 }
 
 template <typename T> void GenCodeVisitor<T>::visit(Program *prog) {
-  // — PASO 1: recolectar literales de string
+  // — PASO 1: sección .data
+  data << ".data\n";
+  data << "print_fmt: .string \"%ld\\n\"\n\n";
+
+  // — recolectar literales de string para listas
   collectingStrings_ = true;
   for (auto d : prog->vardecs->vars) {
     for (auto *init : d->inits)
@@ -1419,10 +1422,6 @@ template <typename T> void GenCodeVisitor<T>::visit(Program *prog) {
         init->accept(this);
   }
   collectingStrings_ = false;
-
-  // — PASO 2: sección .data
-  data << ".data\n";
-  data << "print_fmt: .string \"%ld\\n\"\n\n";
 
   // 2.b) Variables globales (listas)
   inGlobal_ = true;

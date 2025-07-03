@@ -1,4 +1,5 @@
-val s: String = "hello"
+var b: Int = 12
 fun main() {
-    println(s)
+    var y: Int = 17
+    println(b + y)
 }
